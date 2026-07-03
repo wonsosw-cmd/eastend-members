@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex">
+<title>멤버십 가입</title>
+<style>
+  :root {
+    --navy: #1b2a4a;
+    --teal: #2a9d8f;
+    --amber: #e9a13b;
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #22293a;
+    --muted: #8a93a5;
+    --line: #e4e8ee;
+    --danger: #d64545;
+    --brand: var(--navy);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Malgun Gothic", sans-serif;
+    background: var(--bg); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--card); display: flex; flex-direction: column; }
+  .hero { background: var(--brand); color: #fff; padding: 34px 24px 28px; }
+  .hero .brand { font-size: 13px; letter-spacing: 3px; opacity: .85; font-weight: 600; }
+  .hero h1 { font-size: 24px; font-weight: 800; margin-top: 8px; line-height: 1.35; }
+  .hero .store { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; background: rgba(255,255,255,.15); border-radius: 20px; padding: 6px 14px; font-size: 13.5px; font-weight: 600; }
+  .hero .store::before { content: "📍"; }
+  .body { padding: 24px 22px 40px; flex: 1; }
+  .sec-title { font-size: 15px; font-weight: 700; margin: 22px 0 12px; }
+  .sec-title:first-child { margin-top: 0; }
+  .sec-title .req { color: var(--danger); font-size: 12px; margin-left: 4px; font-weight: 600; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+  .field label b { color: var(--danger); font-weight: 600; }
+  .field input[type=text], .field input[type=tel], .field input[type=date], .field select {
+    width: 100%; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: 10px;
+    font-size: 16px; font-family: inherit; background: #fff; color: var(--text);
+    transition: border-color .15s; -webkit-appearance: none; appearance: none;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--brand); }
+  .seg { display: flex; gap: 8px; }
+  .seg input { display: none; }
+  .seg label {
+    flex: 1; text-align: center; padding: 12px 0; border: 1.5px solid var(--line); border-radius: 10px;
+    font-size: 14.5px; font-weight: 600; color: var(--muted); cursor: pointer; margin: 0; display: block;
+  }
+  .seg input:checked + label { border-color: var(--brand); color: var(--brand); background: color-mix(in srgb, var(--brand) 6%, #fff); }
+  .consent-box { border: 1.5px solid var(--line); border-radius: 12px; overflow: hidden; margin-top: 6px; }
+  .consent-all { display: flex; align-items: center; gap: 10px; padding: 15px 16px; background: #fafbfc; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .consent-all span { font-size: 15px; font-weight: 700; }
+  .consent-row { display: flex; align-items: center; gap: 10px; padding: 13px 16px; cursor: pointer; }
+  .consent-row + .consent-row { border-top: 1px solid var(--line); }
+  .consent-row .txt { flex: 1; font-size: 14px; }
+  .consent-row .tag { font-size: 12px; font-weight: 700; margin-right: 3px; }
+  .tag.must { color: var(--danger); }
+  .tag.opt { color: var(--muted); }
+  .consent-row .view { font-size: 12.5px; color: var(--muted); text-decoration: underline; background: none; border: none; cursor: pointer; padding: 4px; font-family: inherit; }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--brand); flex-shrink: 0; }
+  .terms { display: none; padding: 14px 16px; background: #f8f9fb; border-top: 1px solid var(--line); font-size: 12.5px; color: #5a6376; line-height: 1.65; }
+  .terms.open { display: block; }
+  .terms table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+  .terms th, .terms td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; background: #fff; }
+  .terms th { background: #f1f3f6; white-space: nowrap; font-weight: 600; }
+  .submit-btn {
+    width: 100%; margin-top: 24px; padding: 16px; border: none; border-radius: 12px;
+    background: var(--brand); color: #fff; font-size: 16.5px; font-weight: 700; font-family: inherit;
+    cursor: pointer; transition: opacity .15s;
+  }
+  .submit-btn:disabled { opacity: .45; cursor: default; }
+  .footnote { text-align: center; font-size: 11.5px; color: var(--muted); margin-top: 16px; line-height: 1.6; }
+  .err { color: var(--danger); font-size: 12.5px; margin-top: 5px; display: none; }
+  /* 완료 화면 */
+  .done { display: none; text-align: center; padding: 70px 24px; }
+  .done .icon { width: 72px; height: 72px; border-radius: 50%; background: color-mix(in srgb, var(--brand) 10%, #fff); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 34px; }
+  .done h2 { font-size: 21px; font-weight: 800; margin-bottom: 10px; }
+  .done p { font-size: 14.5px; color: var(--muted); line-height: 1.7; }
+  .done .store-chip { display: inline-block; margin-top: 18px; background: var(--bg); border-radius: 20px; padding: 8px 18px; font-size: 13.5px; font-weight: 600; }
+  /* 로딩 오버레이 */
+  .loading { display: none; position: fixed; inset: 0; background: rgba(255,255,255,.75); z-index: 50; align-items: center; justify-content: center; flex-direction: column; gap: 14px; }
+  .loading.on { display: flex; }
+  .spin { width: 38px; height: 38px; border: 4px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: sp 0.8s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .loading span { font-size: 14px; font-weight: 600; color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="brand" id="brandName">EASTEND</div>
+    <h1>멤버십 가입하고<br>혜택을 받아보세요</h1>
+    <div class="store" id="storeName">매장을 선택해주세요</div>
+  </div>
+
+  <div class="body" id="formBody">
+    <form id="joinForm" onsubmit="return false;">
+      <div id="storePickWrap" class="field" style="display:none;">
+        <label>가입 매장 <b>*</b></label>
+        <select id="storePick"></select>
+      </div>
+
+      <div class="sec-title">가입 정보<span class="req">* 필수</span></div>
+      <div class="field">
+        <label>이름 <b>*</b></label>
+        <input type="text" id="fName" placeholder="이름을 입력해주세요" autocomplete="name" maxlength="20">
+        <div class="err" id="errName">이름을 입력해주세요.</div>
+      </div>
+      <div class="field">
+        <label>휴대전화번호 <b>*</b></label>
+        <input type="tel" id="fPhone" placeholder="010-0000-0000" autocomplete="tel" inputmode="numeric" maxlength="13">
+        <div class="err" id="errPhone">올바른 휴대전화번호를 입력해주세요.</div>
+      </div>
+      <div class="field">
+        <label>생년월일 (선택)</label>
+        <input type="text" id="fBirth" placeholder="예: 900101 (6자리)" inputmode="numeric" maxlength="6">
+        <div class="err" id="errBirth">생년월일 6자리(YYMMDD)를 확인해주세요.</div>
+      </div>
+      <div class="field">
+        <label>성별 (선택)</label>
+        <div class="seg">
+          <input type="radio" name="fGender" id="gF" value="여성"><label for="gF">여성</label>
+          <input type="radio" name="fGender" id="gM" value="남성"><label for="gM">남성</label>
+        </div>
+      </div>
+
+      <div class="sec-title">약관 동의</div>
+      <div class="consent-box">
+        <div class="consent-all" onclick="toggleAll(event)">
+          <input type="checkbox" id="cAll">
+          <span>전체 동의</span>
+        </div>
+        <div class="consent-row" onclick="rowClick(event,'cPrivacy')">
+          <input type="checkbox" id="cPrivacy">
+          <span class="txt"><span class="tag must">[필수]</span> 개인정보 수집·이용 동의</span>
+          <button type="button" class="view" onclick="toggleTerms(event,'tPrivacy')">보기</button>
+        </div>
+        <div class="terms" id="tPrivacy">
+          <b>개인정보 수집·이용 동의 (필수)</b>
+          <table>
+            <tr><th>수집 목적</th><td>멤버십 회원 관리, 구매 혜택 제공, 매장 방문 이력 관리, 고객 상담 대응</td></tr>
+            <tr><th>수집 항목</th><td>이름, 휴대전화번호, 가입 매장, 가입 일시 / (선택) 생년월일, 성별</td></tr>
+            <tr><th>보유 기간</th><td>회원 탈퇴 또는 동의 철회 시까지 (관계 법령에 따라 보존이 필요한 경우 해당 기간까지)</td></tr>
+          </table>
+          귀하는 개인정보 수집·이용에 동의하지 않을 권리가 있습니다. 다만 필수 항목 동의를 거부할 경우 멤버십 가입이 제한됩니다.
+          동의 철회 및 개인정보 관련 문의는 매장 직원 또는 고객센터를 통해 요청하실 수 있습니다.
+        </div>
+        <div class="consent-row" onclick="rowClick(event,'cMkt')">
+          <input type="checkbox" id="cMkt">
+          <span class="txt"><span class="tag opt">[선택]</span> 마케팅 정보 수신 동의 (SMS·카카오톡)</span>
+          <button type="button" class="view" onclick="toggleTerms(event,'tMkt')">보기</button>
+        </div>
+        <div class="terms" id="tMkt">
+          <b>마케팅 정보 수신 동의 (선택)</b><br>
+          신상품 소식, 할인 행사, 쿠폰 등 광고성 정보를 SMS·카카오톡으로 받아보실 수 있습니다.
+          동의하지 않으셔도 멤버십 가입에는 제한이 없으며, 수신 동의는 언제든지 철회할 수 있습니다.
+          <table>
+            <tr><th>이용 목적</th><td>신상품·이벤트·할인 혜택 등 광고성 정보 전송</td></tr>
+            <tr><th>이용 항목</th><td>이름, 휴대전화번호</td></tr>
+            <tr><th>보유 기간</th><td>수신 동의 철회 또는 회원 탈퇴 시까지</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="err" id="errConsent">필수 약관에 동의해주세요.</div>
+
+      <button type="button" class="submit-btn" id="btnSubmit" onclick="submitJoin()">가입하기</button>
+      <div class="footnote">입력하신 정보는 암호화된 통신으로 안전하게 전송되며,<br>동의하신 목적 외로 사용되지 않습니다.</div>
+    </form>
+  </div>
+
+  <div class="done" id="doneBody">
+    <div class="icon">🎉</div>
+    <h2 id="doneTitle">가입이 완료되었습니다!</h2>
+    <p id="doneMsg">멤버십 혜택은 매장 직원에게 문의해주세요.<br>방문해주셔서 감사합니다.</p>
+    <div class="store-chip" id="doneStore"></div>
+  </div>
+</div>
+
+<div class="loading" id="loading"><div class="spin"></div><span>가입 처리 중...</span></div>
+
+<script src="stores.js"></script>
+<script src="config.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+let storeId = (params.get("store") || "").toUpperCase();
+let store = window.EE_STORE_BY_ID[storeId] || null;
+
+function applyBrand() {
+  if (!store) return;
+  document.getElementById("brandName").textContent = store.brand;
+  document.getElementById("storeName").textContent = store.brandKo + " " + store.name;
+  document.title = store.brandKo + " 멤버십 가입";
+  // 브랜드 컬러: 시티브리즈=네이비, 아티드=틸
+  document.documentElement.style.setProperty("--brand", store.brand === "ARTID" ? "#2a9d8f" : "#1b2a4a");
+}
+
+// store 파라미터가 없거나 잘못된 경우 → 매장 선택 드롭다운 표시
+if (!store) {
+  const wrap = document.getElementById("storePickWrap");
+  const sel = document.getElementById("storePick");
+  wrap.style.display = "block";
+  sel.innerHTML = '<option value="">매장을 선택해주세요</option>' +
+    window.EE_STORES.map(s => `<option value="${s.id}">[${s.brandKo}] ${s.name}</option>`).join("");
+  sel.addEventListener("change", () => {
+    store = window.EE_STORE_BY_ID[sel.value] || null;
+    storeId = sel.value;
+    applyBrand();
+  });
+} else {
+  applyBrand();
+}
+
+// 전화번호 자동 하이픈
+document.getElementById("fPhone").addEventListener("input", e => {
+  let v = e.target.value.replace(/\D/g, "").slice(0, 11);
+  if (v.length > 7) v = v.slice(0,3) + "-" + v.slice(3,7) + "-" + v.slice(7);
+  else if (v.length > 3) v = v.slice(0,3) + "-" + v.slice(3);
+  e.target.value = v;
+});
+document.getElementById("fBirth").addEventListener("input", e => {
+  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+});
+
+function rowClick(ev, id) {
+  if (ev.target.tagName === "BUTTON" || ev.target.tagName === "INPUT") { syncAll(); return; }
+  const cb = document.getElementById(id);
+  cb.checked = !cb.checked;
+  syncAll();
+}
+function toggleAll(ev) {
+  const all = document.getElementById("cAll");
+  if (ev.target.tagName !== "INPUT") all.checked = !all.checked;
+  document.getElementById("cPrivacy").checked = all.checked;
+  document.getElementById("cMkt").checked = all.checked;
+}
+function syncAll() {
+  document.getElementById("cAll").checked =
+    document.getElementById("cPrivacy").checked && document.getElementById("cMkt").checked;
+}
+document.getElementById("cPrivacy").addEventListener("change", syncAll);
+document.getElementById("cMkt").addEventListener("change", syncAll);
+function toggleTerms(ev, id) {
+  ev.stopPropagation();
+  document.getElementById(id).classList.toggle("open");
+}
+
+function showErr(id, on) { document.getElementById(id).style.display = on ? "block" : "none"; }
+
+async function submitJoin() {
+  const name = document.getElementById("fName").value.trim();
+  const phone = document.getElementById("fPhone").value.trim();
+  const birth = document.getElementById("fBirth").value.trim();
+  const gender = (document.querySelector('input[name=fGender]:checked') || {}).value || "";
+  const okPrivacy = document.getElementById("cPrivacy").checked;
+  const okMkt = document.getElementById("cMkt").checked;
+
+  let bad = false;
+  showErr("errName", !name); bad = bad || !name;
+  const phoneOk = /^01[016789]-\d{3,4}-\d{4}$/.test(phone);
+  showErr("errPhone", !phoneOk); bad = bad || !phoneOk;
+  const birthOk = !birth || /^\d{6}$/.test(birth);
+  showErr("errBirth", !birthOk); bad = bad || !birthOk;
+  showErr("errConsent", !okPrivacy); bad = bad || !okPrivacy;
+  if (!store) { alert("가입 매장을 선택해주세요."); bad = true; }
+  if (bad) return;
+
+  if (!window.EE_CONFIG.API_URL) {
+    alert("아직 서버(Apps Script) 연결이 설정되지 않았습니다.\n관리자에게 문의해주세요.");
+    return;
+  }
+
+  const payload = {
+    action: "join",
+    storeId: store.id, storeName: store.name, brand: store.brandKo,
+    name, phone, birth, gender,
+    consentPrivacy: okPrivacy, consentMarketing: okMkt,
+    ua: navigator.userAgent,
+  };
+
+  const loading = document.getElementById("loading");
+  const btn = document.getElementById("btnSubmit");
+  loading.classList.add("on"); btn.disabled = true;
+  try {
+    // text/plain → CORS preflight 없이 GAS doPost로 전달됨
+    const res = await fetch(window.EE_CONFIG.API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+    });
+    const j = await res.json();
+    if (j.result !== "ok") throw new Error(j.message || "server error");
+    document.getElementById("formBody").style.display = "none";
+    const done = document.getElementById("doneBody");
+    done.style.display = "block";
+    document.getElementById("doneStore").textContent = store.brandKo + " " + store.name;
+    if (j.status === "existing") {
+      document.getElementById("doneTitle").textContent = "이미 가입된 회원입니다";
+      document.getElementById("doneMsg").innerHTML = "방문 정보가 업데이트되었습니다.<br>멤버십 혜택은 매장 직원에게 문의해주세요.";
+    }
+    window.scrollTo(0, 0);
+  } catch (err) {
+    alert("가입 처리 중 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.\n(" + err.message + ")");
+  } finally {
+    loading.classList.remove("on"); btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

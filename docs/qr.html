@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>매장별 QR 포스터</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Pretendard", -apple-system, "Malgun Gothic", sans-serif; background: #eef0f4; color: #22293a; }
+  .toolbar {
+    position: sticky; top: 0; z-index: 10; background: #1b2a4a; color: #fff;
+    padding: 14px 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  .toolbar b { font-size: 15px; margin-right: 8px; }
+  .toolbar select, .toolbar button {
+    padding: 8px 14px; border-radius: 8px; border: none; font-size: 14px; font-family: inherit; cursor: pointer;
+  }
+  .toolbar button { background: #e9a13b; color: #1b2a4a; font-weight: 700; }
+  .posters { display: flex; flex-wrap: wrap; gap: 24px; padding: 28px; justify-content: center; }
+  .poster {
+    width: 380px; background: #fff; border-radius: 18px; overflow: hidden;
+    box-shadow: 0 4px 18px rgba(27,42,74,.12); text-align: center;
+    page-break-after: always; break-inside: avoid;
+  }
+  .poster .head { padding: 30px 20px 22px; color: #fff; }
+  .poster .head .b { font-size: 13px; letter-spacing: 4px; font-weight: 700; opacity: .85; }
+  .poster .head h2 { font-size: 25px; font-weight: 800; margin-top: 10px; line-height: 1.4; }
+  .poster .qr { padding: 30px 0 12px; display: flex; justify-content: center; }
+  .poster .qr > div { padding: 14px; border: 2px solid #e4e8ee; border-radius: 14px; }
+  .poster .store { font-size: 17px; font-weight: 800; margin-top: 12px; }
+  .poster .code { font-size: 11.5px; color: #8a93a5; margin-top: 4px; letter-spacing: 1px; }
+  .poster .desc { font-size: 13.5px; color: #5a6376; line-height: 1.7; padding: 16px 26px 30px; }
+  @media print {
+    .toolbar { display: none; }
+    body { background: #fff; }
+    .posters { padding: 0; gap: 0; }
+    .poster { box-shadow: none; border-radius: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <b>매장별 QR 포스터</b>
+  <select id="storeSel">
+    <option value="ALL">전체 매장</option>
+  </select>
+  <button onclick="window.print()">🖨 인쇄 / PDF 저장</button>
+</div>
+<div class="posters" id="posters"></div>
+
+<script src="stores.js"></script>
+<script>
+const BASE_URL = location.origin + location.pathname.replace(/qr\.html$/, "");
+
+const sel = document.getElementById("storeSel");
+window.EE_STORES.forEach(s => {
+  const o = document.createElement("option");
+  o.value = s.id; o.textContent = `[${s.brandKo}] ${s.name}`;
+  sel.appendChild(o);
+});
+sel.addEventListener("change", render);
+
+function render() {
+  const box = document.getElementById("posters");
+  box.innerHTML = "";
+  const list = sel.value === "ALL" ? window.EE_STORES : [window.EE_STORE_BY_ID[sel.value]];
+  list.forEach(s => {
+    const color = s.brand === "ARTID" ? "#2a9d8f" : "#1b2a4a";
+    const url = `${BASE_URL}?store=${s.id}`;
+    const card = document.createElement("div");
+    card.className = "poster";
+    card.innerHTML = `
+      <div class="head" style="background:${color}">
+        <div class="b">${s.brand}</div>
+        <h2>QR 찍고<br>멤버십 가입하세요</h2>
+      </div>
+      <div class="qr"><div id="qr_${s.id}"></div></div>
+      <div class="store">${s.brandKo} ${s.name}</div>
+      <div class="code">${s.id}</div>
+      <div class="desc">카메라로 QR 코드를 스캔하면<br>가입 페이지로 연결됩니다.<br>가입 즉시 멤버십 혜택을 받아보세요!</div>`;
+    box.appendChild(card);
+    new QRCode(document.getElementById("qr_" + s.id), {
+      text: url, width: 190, height: 190,
+      colorDark: "#1b2a4a", colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  });
+}
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>멤버십 관리자</title>
+<style>
+  :root { --navy: #1b2a4a; --teal: #2a9d8f; --amber: #e9a13b; --bg: #f2f4f7; --line: #e4e8ee; --muted: #8a93a5; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Pretendard", -apple-system, "Malgun Gothic", sans-serif; background: var(--bg); color: #22293a; }
+  header { background: var(--navy); color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; font-weight: 800; }
+  header .sp { flex: 1; }
+  header button { padding: 8px 14px; border: none; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; background: rgba(255,255,255,.15); color: #fff; }
+  header button.primary { background: var(--amber); color: var(--navy); }
+  .container { max-width: 1100px; margin: 0 auto; padding: 22px 18px 60px; }
+  /* 로그인 */
+  .gate { max-width: 360px; margin: 90px auto; background: #fff; border-radius: 16px; padding: 34px 30px; box-shadow: 0 4px 18px rgba(27,42,74,.1); text-align: center; }
+  .gate h2 { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+  .gate p { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .gate input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 10px; font-size: 15px; font-family: inherit; margin-bottom: 12px; }
+  .gate button { width: 100%; padding: 13px; border: none; border-radius: 10px; background: var(--navy); color: #fff; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; }
+  .gate .msg { font-size: 12.5px; color: #d64545; margin-top: 10px; min-height: 16px; }
+  /* 통계 카드 */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(27,42,74,.06); }
+  .card .k { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .card .v { font-size: 26px; font-weight: 800; margin-top: 6px; }
+  .card .v small { font-size: 13px; color: var(--muted); font-weight: 600; }
+  /* 필터 */
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filters select, .filters input { padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; font-size: 14px; font-family: inherit; background: #fff; }
+  .filters input { flex: 1; min-width: 180px; }
+  /* 테이블 */
+  .tbl-wrap { background: #fff; border-radius: 14px; overflow: auto; box-shadow: 0 2px 8px rgba(27,42,74,.06); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 760px; }
+  th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { background: #f8f9fb; font-size: 12px; color: var(--muted); font-weight: 700; position: sticky; top: 0; }
+  tr:hover td { background: #fafbfd; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 700; }
+  .pill.city { background: #e8ecf5; color: var(--navy); }
+  .pill.artid { background: #e2f3f1; color: #1d7a70; }
+  .pill.y { background: #e2f3e6; color: #2c7a3e; }
+  .pill.n { background: #f3f4f6; color: var(--muted); }
+  .empty { padding: 44px; text-align: center; color: var(--muted); font-size: 14px; }
+  .count-note { font-size: 12.5px; color: var(--muted); margin: 10px 2px; }
+</style>
+</head>
+<body>
+<div id="gateView" class="gate">
+  <h2>멤버십 관리자</h2>
+  <p>관리자 토큰을 입력해주세요.</p>
+  <input type="password" id="tokenInput" placeholder="관리자 토큰" onkeydown="if(event.key==='Enter')login()">
+  <button onclick="login()">접속</button>
+  <div class="msg" id="gateMsg"></div>
+</div>
+
+<div id="mainView" style="display:none;">
+  <header>
+    <h1>EASTEND 오프라인 멤버십 관리</h1>
+    <div class="sp"></div>
+    <button class="primary" onclick="downloadCsv()">CSV 다운로드</button>
+    <button onclick="loadData()">새로고침</button>
+    <button onclick="logout()">로그아웃</button>
+  </header>
+  <div class="container">
+    <div class="cards">
+      <div class="card"><div class="k">전체 회원</div><div class="v" id="stTotal">-</div></div>
+      <div class="card"><div class="k">오늘 신규</div><div class="v" id="stToday">-</div></div>
+      <div class="card"><div class="k">최근 7일</div><div class="v" id="stWeek">-</div></div>
+      <div class="card"><div class="k">마케팅 수신 동의</div><div class="v" id="stMkt">-</div></div>
+    </div>
+    <div class="filters">
+      <select id="fBrand"><option value="">브랜드 전체</option><option>시티브리즈</option><option>아티드</option></select>
+      <select id="fStore"><option value="">매장 전체</option></select>
+      <select id="fMkt"><option value="">마케팅동의 전체</option><option value="Y">동의</option><option value="N">미동의</option></select>
+      <input type="text" id="fSearch" placeholder="이름 / 전화번호 검색">
+    </div>
+    <div class="count-note" id="countNote"></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>가입일시</th><th>브랜드</th><th>매장</th><th>이름</th><th>휴대전화</th>
+          <th>생년월일</th><th>성별</th><th>마케팅동의</th><th>최근방문</th><th>방문횟수</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="10" class="empty">데이터를 불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="stores.js"></script>
+<script src="config.js"></script>
+<script>
+let TOKEN = sessionStorage.getItem("ee_admin_token") || "";
+let ROWS = [];
+
+// 매장 필터 옵션
+const fs = document.getElementById("fStore");
+window.EE_STORES.forEach(s => {
+  const o = document.createElement("option");
+  o.value = s.name; o.textContent = `[${s.brandKo}] ${s.name}`;
+  fs.appendChild(o);
+});
+["fBrand","fStore","fMkt"].forEach(id => document.getElementById(id).addEventListener("change", renderTable));
+document.getElementById("fSearch").addEventListener("input", renderTable);
+
+if (TOKEN) { showMain(); }
+
+async function login() {
+  const t = document.getElementById("tokenInput").value.trim();
+  if (!t) return;
+  document.getElementById("gateMsg").textContent = "확인 중...";
+  try {
+    const j = await api("list", t);
+    if (j.result !== "ok") throw new Error(j.message || "인증 실패");
+    TOKEN = t;
+    sessionStorage.setItem("ee_admin_token", t);
+    ROWS = j.rows;
+    showMain(true);
+  } catch (e) {
+    document.getElementById("gateMsg").textContent = "인증에 실패했습니다. 토큰을 확인해주세요.";
+  }
+}
+function logout() {
+  sessionStorage.removeItem("ee_admin_token");
+  location.reload();
+}
+function showMain(skipLoad) {
+  document.getElementById("gateView").style.display = "none";
+  document.getElementById("mainView").style.display = "block";
+  if (skipLoad) { renderAll(); } else { loadData(); }
+}
+
+async function api(action, token) {
+  if (!window.EE_CONFIG.API_URL) throw new Error("config.js에 API_URL이 설정되지 않았습니다.");
+  const url = `${window.EE_CONFIG.API_URL}?action=${action}&token=${encodeURIComponent(token)}`;
+  const res = await fetch(url);
+  return res.json();
+}
+
+async function loadData() {
+  document.getElementById("tbody").innerHTML = '<tr><td colspan="10" class="empty">데이터를 불러오는 중...</td></tr>';
+  try {
+    const j = await api("list", TOKEN);
+    if (j.result !== "ok") throw new Error(j.message);
+    ROWS = j.rows;
+    renderAll();
+  } catch (e) {
+    document.getElementById("tbody").innerHTML = `<tr><td colspan="10" class="empty">불러오기 실패: ${e.message}<br>토큰이 만료되었으면 로그아웃 후 다시 접속해주세요.</td></tr>`;
+  }
+}
+
+function renderAll() { renderStats(); renderTable(); }
+
+function ymd(d) { return d ? String(d).slice(0, 10) : ""; }
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+function renderStats() {
+  const today = todayStr();
+  const week = new Date(Date.now() - 6*86400000);
+  document.getElementById("stTotal").textContent = ROWS.length.toLocaleString();
+  document.getElementById("stToday").textContent = ROWS.filter(r => ymd(r.joinedAt) === today).length.toLocaleString();
+  document.getElementById("stWeek").textContent = ROWS.filter(r => new Date(ymd(r.joinedAt)) >= week).length.toLocaleString();
+  const mkt = ROWS.filter(r => r.consentMarketing === "Y").length;
+  document.getElementById("stMkt").innerHTML = mkt.toLocaleString() +
+    ` <small>(${ROWS.length ? Math.round(mkt/ROWS.length*100) : 0}%)</small>`;
+}
+
+function renderTable() {
+  const b = document.getElementById("fBrand").value;
+  const s = document.getElementById("fStore").value;
+  const m = document.getElementById("fMkt").value;
+  const q = document.getElementById("fSearch").value.trim();
+  const list = ROWS.filter(r =>
+    (!b || r.brand === b) && (!s || r.storeName === s) &&
+    (!m || r.consentMarketing === m) &&
+    (!q || (r.name||"").includes(q) || (r.phone||"").includes(q))
+  ).sort((a,b2) => String(b2.joinedAt).localeCompare(String(a.joinedAt)));
+
+  document.getElementById("countNote").textContent = `${list.length.toLocaleString()}명 표시 중 (전체 ${ROWS.length.toLocaleString()}명)`;
+  const tb = document.getElementById("tbody");
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="empty">조건에 맞는 회원이 없습니다.</td></tr>'; return; }
+  tb.innerHTML = list.map(r => `<tr>
+    <td>${String(r.joinedAt).slice(0,16).replace("T"," ")}</td>
+    <td><span class="pill ${r.brand==="아티드"?"artid":"city"}">${r.brand||""}</span></td>
+    <td>${r.storeName||""}</td>
+    <td>${r.name||""}</td>
+    <td>${r.phone||""}</td>
+    <td>${r.birth||""}</td>
+    <td>${r.gender||""}</td>
+    <td><span class="pill ${r.consentMarketing==="Y"?"y":"n"}">${r.consentMarketing==="Y"?"동의":"미동의"}</span></td>
+    <td>${String(r.lastVisit||"").slice(0,10)}</td>
+    <td>${r.visitCount||1}</td>
+  </tr>`).join("");
+}
+
+function downloadCsv() {
+  const header = ["가입일시","브랜드","매장코드","매장","이름","휴대전화","생년월일","성별","개인정보동의","마케팅동의","최근방문","방문횟수"];
+  const lines = [header.join(",")].concat(ROWS.map(r => [
+    String(r.joinedAt).slice(0,19).replace("T"," "), r.brand, r.storeId, r.storeName, r.name, r.phone,
+    r.birth, r.gender, r.consentPrivacy, r.consentMarketing, String(r.lastVisit||"").slice(0,10), r.visitCount||1
+  ].map(v => `"${String(v==null?"":v).replace(/"/g,'""')}"`).join(",")));
+  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `멤버십_회원목록_${todayStr()}.csv`;
+  a.click();
+}
+</script>
+</body>
+</html>
