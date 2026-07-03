@@ -1,0 +1,4 @@
+# 로컬 전용 — 개인정보/토큰은 절대 커밋 금지
+tools/local_config.json
+qr_png/
+*.xlsx
