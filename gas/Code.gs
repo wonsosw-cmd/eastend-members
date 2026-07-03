@@ -1,26 +1,23 @@
 /**
- * EASTEND 오프라인 멤버십 — Apps Script 백엔드
+ * EASTEND 오프라인 멤버십 v2 — Apps Script 백엔드
+ * 회원가입 + 영수증 적립(1%, 7일 후 확정) + 매장 적립/차감
  *
- * [설치 순서]
- * 1. 새 Google 스프레드시트 생성 (이름 예: "오프라인 멤버십 회원DB") — 반드시 비공개 유지
- * 2. 확장 프로그램 > Apps Script > 이 코드 전체 붙여넣기
- * 3. 함수 setup 실행 1회 (시트 헤더 생성 + 관리자 토큰 발급, 로그에 토큰 출력됨)
- * 4. 배포 > 새 배포 > 유형: 웹 앱
- *    - 실행 계정: 나
- *    - 액세스 권한: 모든 사용자 (익명 포함) ← QR로 접속하는 고객이 로그인 없이 제출해야 하므로 필수
- * 5. 발급된 웹앱 URL(…/exec)을 GitHub 레포 docs/config.js 의 API_URL에 붙여넣고 push
- *
- * 시트에는 개인정보가 저장되므로 절대 링크 공유하지 말 것.
+ * 시트: 회원 / 영수증 / 포인트   (개인정보 포함 — 링크 공유 금지)
+ * 코드 업데이트 후: setup2 1회 실행 → 배포 > 배포 관리 > 수정 > 새 버전
  */
 
-var SHEET_NAME = "회원";
+var SHEET_MEMBER = "회원";
+var SHEET_RECEIPT = "영수증";
+var SHEET_POINT = "포인트";
+var EARN_RATE = 0.01;      // 적립률 1%
+var EARN_DELAY_DAYS = 7;   // 제출 후 확정까지 일수
 
 // ─────────────────────────────────────────────
-// 최초 1회 실행: 시트 준비 + 관리자 토큰 발급
+// 최초 1회: 시트 준비 + 관리자 토큰
 // ─────────────────────────────────────────────
 function setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+  var sh = ss.getSheetByName(SHEET_MEMBER) || ss.insertSheet(SHEET_MEMBER);
   if (sh.getLastRow() === 0) {
     sh.appendRow([
       "가입일시", "브랜드", "매장코드", "매장명", "이름", "휴대전화",
@@ -36,77 +33,218 @@ function setup() {
     props.setProperty("ADMIN_TOKEN", token);
   }
   Logger.log("관리자 토큰: " + token);
-  Logger.log("이 토큰을 admin.html 접속 시 입력하세요.");
-}
-
-function getSheet_() {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
 }
 
 // ─────────────────────────────────────────────
-// POST: 가입 처리 (고객 폼에서 호출)
+// v2 업그레이드 1회 실행: 영수증/포인트 시트 + 매장 토큰 + 드라이브 폴더 + 자동확정 트리거
+// ─────────────────────────────────────────────
+function setup2() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var r = ss.getSheetByName(SHEET_RECEIPT) || ss.insertSheet(SHEET_RECEIPT);
+  if (r.getLastRow() === 0) {
+    r.appendRow([
+      "제출일시", "전화번호", "이름", "브랜드", "매장코드", "매장명",
+      "영수증번호", "결제금액", "적립예정포인트", "적립예정일",
+      "상태", "확정일시", "사진링크", "제출경로", "메모"
+    ]);
+    r.setFrozenRows(1);
+  }
+
+  var p = ss.getSheetByName(SHEET_POINT) || ss.insertSheet(SHEET_POINT);
+  if (p.getLastRow() === 0) {
+    p.appendRow([
+      "일시", "전화번호", "이름", "유형", "포인트",
+      "관련영수증번호", "매장코드", "매장명", "메모"
+    ]);
+    p.setFrozenRows(1);
+  }
+
+  var props = PropertiesService.getScriptProperties();
+  var staffToken = props.getProperty("STAFF_TOKEN");
+  if (!staffToken) {
+    staffToken = Utilities.getUuid().replace(/-/g, "").slice(0, 12);
+    props.setProperty("STAFF_TOKEN", staffToken);
+  }
+
+  // 영수증 사진 저장 폴더
+  var folderId = props.getProperty("PHOTO_FOLDER_ID");
+  if (!folderId) {
+    var folder = DriveApp.createFolder("멤버십_영수증사진");
+    props.setProperty("PHOTO_FOLDER_ID", folder.getId());
+  }
+
+  // 매일 새벽 3시 적립 자동확정 트리거 (중복 생성 방지)
+  var has = ScriptApp.getProjectTriggers().some(function (t) {
+    return t.getHandlerFunction() === "confirmReceipts";
+  });
+  if (!has) {
+    ScriptApp.newTrigger("confirmReceipts").timeBased().everyDays(1).atHour(3).create();
+  }
+
+  Logger.log("관리자 토큰: " + props.getProperty("ADMIN_TOKEN"));
+  Logger.log("매장용 토큰: " + staffToken);
+  Logger.log("v2 준비 완료 (영수증/포인트 시트, 사진 폴더, 자동확정 트리거)");
+}
+
+function sheet_(name) {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+}
+function props_() {
+  return PropertiesService.getScriptProperties();
+}
+function maskName_(name) {
+  var s = String(name || "");
+  if (s.length <= 1) return s;
+  if (s.length === 2) return s.charAt(0) + "*";
+  return s.charAt(0) + Array(s.length - 1).join("*") + s.charAt(s.length - 1);
+}
+
+// 회원 찾기: [행번호, 이름] (없으면 행번호 0)
+function findMember_(phone) {
+  var sh = sheet_(SHEET_MEMBER);
+  var last = sh.getLastRow();
+  if (last < 2) return [0, ""];
+  var vals = sh.getRange(2, 5, last - 1, 2).getValues(); // E:이름, F:전화
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][1]).trim() === phone) return [i + 2, String(vals[i][0])];
+  }
+  return [0, ""];
+}
+
+// 포인트 잔액(확정분) 계산
+function getBalance_(phone) {
+  var sh = sheet_(SHEET_POINT);
+  var last = sh.getLastRow();
+  var bal = 0;
+  if (last < 2) return 0;
+  var vals = sh.getRange(2, 2, last - 1, 4).getValues(); // B:전화, E:포인트(5번째지만 range로 B~E)
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]).trim() === phone) bal += Number(vals[i][3]) || 0;
+  }
+  return bal;
+}
+
+// 전체 잔액 맵 (관리자 목록용)
+function balanceMap_() {
+  var sh = sheet_(SHEET_POINT);
+  var last = sh.getLastRow();
+  var map = {};
+  if (last < 2) return map;
+  var vals = sh.getRange(2, 2, last - 1, 4).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    var ph = String(vals[i][0]).trim();
+    map[ph] = (map[ph] || 0) + (Number(vals[i][3]) || 0);
+  }
+  return map;
+}
+
+// 대기중(미확정) 적립 합계
+function getPending_(phone) {
+  var sh = sheet_(SHEET_RECEIPT);
+  var last = sh.getLastRow();
+  var sum = 0;
+  if (last < 2) return 0;
+  var vals = sh.getRange(2, 2, last - 1, 10).getValues(); // B전화 ~ K상태
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]).trim() === phone && String(vals[i][9]) === "대기") {
+      sum += Number(vals[i][7]) || 0; // 적립예정포인트
+    }
+  }
+  return sum;
+}
+
+// 영수증번호 중복 확인
+function receiptExists_(no) {
+  var sh = sheet_(SHEET_RECEIPT);
+  var last = sh.getLastRow();
+  if (last < 2) return false;
+  var vals = sh.getRange(2, 7, last - 1, 1).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]).trim() === no) return true;
+  }
+  return false;
+}
+
+// 사진 저장 → URL
+function savePhoto_(b64, mime, receiptNo) {
+  try {
+    if (!b64) return "";
+    var folderId = props_().getProperty("PHOTO_FOLDER_ID");
+    if (!folderId) return "";
+    var blob = Utilities.newBlob(Utilities.base64Decode(b64), mime || "image/jpeg",
+      "영수증_" + receiptNo + "_" + Utilities.formatDate(new Date(), "Asia/Seoul", "yyyyMMdd_HHmmss") + ".jpg");
+    var file = DriveApp.getFolderById(folderId).createFile(blob);
+    return file.getUrl();
+  } catch (err) {
+    return "저장실패:" + String(err).slice(0, 80);
+  }
+}
+
+// 영수증 등록 공통
+function addReceipt_(o) {
+  var no = String(o.receiptNo || "").trim();
+  var amt = Math.round(Number(String(o.amount || "").replace(/[^0-9]/g, "")));
+  if (!no) return { ok: false, message: "영수증 번호 누락" };
+  if (!amt || amt <= 0) return { ok: false, message: "결제금액 오류" };
+  if (receiptExists_(no)) return { ok: false, message: "이미 등록된 영수증입니다" };
+
+  var pts = Math.floor(amt * EARN_RATE);
+  var now = new Date();
+  var due = new Date(now.getTime() + EARN_DELAY_DAYS * 86400000);
+  var photoUrl = savePhoto_(o.photo, o.photoType, no);
+
+  sheet_(SHEET_RECEIPT).appendRow([
+    now, o.phone, o.name, o.brand || "", o.storeId || "", o.storeName || "",
+    no, amt, pts, due, "대기", "", photoUrl, o.via || "", ""
+  ]);
+  var r = sheet_(SHEET_RECEIPT).getLastRow();
+  sheet_(SHEET_RECEIPT).getRange(r, 7).setNumberFormat("@"); // 영수증번호 텍스트
+
+  return { ok: true, points: pts, dueDate: Utilities.formatDate(due, "Asia/Seoul", "yyyy-MM-dd") };
+}
+
+// ─────────────────────────────────────────────
+// 매일 새벽: 7일 지난 대기 영수증 → 포인트 확정
+// ─────────────────────────────────────────────
+function confirmReceipts() {
+  var sh = sheet_(SHEET_RECEIPT);
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var now = new Date();
+  var vals = sh.getRange(2, 1, last - 1, 11).getValues();
+  for (var i = 0; i < vals.length; i++) {
+    var status = String(vals[i][10]);
+    var due = vals[i][9];
+    if (status === "대기" && due instanceof Date && due <= now) {
+      var row = i + 2;
+      sheet_(SHEET_POINT).appendRow([
+        now, vals[i][1], vals[i][2], "적립", Number(vals[i][8]) || 0,
+        String(vals[i][6]), vals[i][4], vals[i][5], "영수증 적립 자동확정"
+      ]);
+      sh.getRange(row, 11).setValue("확정");
+      sh.getRange(row, 12).setValue(now);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// POST
 // ─────────────────────────────────────────────
 function doPost(e) {
   var lock = LockService.getScriptLock();
-  lock.waitLock(10000); // 동시 제출 대비
+  lock.waitLock(15000);
   try {
     var p = JSON.parse(e.postData.contents || "{}");
-    if (p.action !== "join") return json_({ result: "error", message: "unknown action" });
+    var action = String(p.action || "");
 
-    // 서버측 검증
-    var name = String(p.name || "").trim().slice(0, 20);
-    var phone = String(p.phone || "").trim();
-    if (!name) return json_({ result: "error", message: "이름 누락" });
-    if (!/^01[016789]-\d{3,4}-\d{4}$/.test(phone)) return json_({ result: "error", message: "전화번호 형식 오류" });
-    if (p.consentPrivacy !== true) return json_({ result: "error", message: "필수 동의 누락" });
+    if (action === "join") return handleJoin_(p);
+    if (action === "receipt") return handleReceipt_(p);
+    if (action === "staff_lookup") return handleStaffLookup_(p);
+    if (action === "staff_earn") return handleStaffEarn_(p);
+    if (action === "staff_redeem") return handleStaffRedeem_(p);
 
-    var sh = getSheet_();
-    var now = new Date();
-
-    // 전화번호로 중복 확인 (F열)
-    var last = sh.getLastRow();
-    var existingRow = 0;
-    if (last >= 2) {
-      var phones = sh.getRange(2, 6, last - 1, 1).getValues();
-      for (var i = 0; i < phones.length; i++) {
-        if (String(phones[i][0]).trim() === phone) { existingRow = i + 2; break; }
-      }
-    }
-
-    if (existingRow) {
-      // 기존 회원 → 최근방문(L), 방문횟수(M) 업데이트
-      var cnt = Number(sh.getRange(existingRow, 13).getValue()) || 1;
-      sh.getRange(existingRow, 12).setValue(now);
-      sh.getRange(existingRow, 13).setValue(cnt + 1);
-      // 마케팅 동의를 새로 한 경우만 갱신 (동의 철회는 폼으로 처리하지 않음)
-      if (p.consentMarketing === true) {
-        sh.getRange(existingRow, 10).setValue("Y");
-        sh.getRange(existingRow, 11).setValue(now);
-      }
-      return json_({ result: "ok", status: "existing" });
-    }
-
-    sh.appendRow([
-      now,                                   // 가입일시
-      String(p.brand || ""),                 // 브랜드
-      String(p.storeId || ""),               // 매장코드
-      String(p.storeName || ""),             // 매장명
-      name,                                  // 이름
-      phone,                                 // 휴대전화
-      String(p.birth || ""),                 // 생년월일(YYMMDD)
-      String(p.gender || ""),                // 성별
-      "Y",                                   // 개인정보동의 (필수라 항상 Y)
-      p.consentMarketing === true ? "Y" : "N", // 마케팅동의
-      now,                                   // 동의일시
-      now,                                   // 최근방문
-      1,                                     // 방문횟수
-      String(p.ua || "").slice(0, 200)       // UserAgent (동의 증적 보조)
-    ]);
-    // 전화/생년월일이 숫자로 변형되지 않도록 텍스트 서식
-    var r = sh.getLastRow();
-    sh.getRange(r, 6, 1, 2).setNumberFormat("@");
-
-    return json_({ result: "ok", status: "new" });
+    return json_({ result: "error", message: "unknown action" });
   } catch (err) {
     return json_({ result: "error", message: String(err) });
   } finally {
@@ -114,43 +252,178 @@ function doPost(e) {
   }
 }
 
+function handleJoin_(p) {
+  var name = String(p.name || "").trim().slice(0, 20);
+  var phone = String(p.phone || "").trim();
+  if (!name) return json_({ result: "error", message: "이름 누락" });
+  if (!/^01[016789]-\d{3,4}-\d{4}$/.test(phone)) return json_({ result: "error", message: "전화번호 형식 오류" });
+  if (p.consentPrivacy !== true) return json_({ result: "error", message: "필수 동의 누락" });
+
+  var sh = sheet_(SHEET_MEMBER);
+  var now = new Date();
+  var found = findMember_(phone);
+  var status;
+
+  if (found[0]) {
+    var cnt = Number(sh.getRange(found[0], 13).getValue()) || 1;
+    sh.getRange(found[0], 12).setValue(now);
+    sh.getRange(found[0], 13).setValue(cnt + 1);
+    if (p.consentMarketing === true) {
+      sh.getRange(found[0], 10).setValue("Y");
+      sh.getRange(found[0], 11).setValue(now);
+    }
+    status = "existing";
+    name = found[1]; // 시트 등록명 기준
+  } else {
+    sh.appendRow([
+      now, String(p.brand || ""), String(p.storeId || ""), String(p.storeName || ""),
+      name, phone, String(p.birth || ""), String(p.gender || ""),
+      "Y", p.consentMarketing === true ? "Y" : "N", now, now, 1,
+      String(p.ua || "").slice(0, 200)
+    ]);
+    var r = sh.getLastRow();
+    sh.getRange(r, 6, 1, 2).setNumberFormat("@");
+    status = "new";
+  }
+
+  // 선택: 가입과 동시에 영수증 적립 신청
+  var receipt = null;
+  if (p.receiptNo) {
+    receipt = addReceipt_({
+      phone: phone, name: name, brand: p.brand, storeId: p.storeId,
+      storeName: p.storeName, receiptNo: p.receiptNo, amount: p.receiptAmount,
+      photo: p.photo, photoType: p.photoType, via: "가입폼"
+    });
+  }
+
+  return json_({ result: "ok", status: status, receipt: receipt });
+}
+
+// 기존 회원 영수증 적립 신청 (receipt.html)
+function handleReceipt_(p) {
+  var phone = String(p.phone || "").trim();
+  if (!/^01[016789]-\d{3,4}-\d{4}$/.test(phone)) return json_({ result: "error", message: "전화번호 형식 오류" });
+  var found = findMember_(phone);
+  if (!found[0]) return json_({ result: "error", message: "가입되지 않은 번호입니다. 먼저 멤버십에 가입해주세요." });
+
+  var receipt = addReceipt_({
+    phone: phone, name: found[1], brand: p.brand, storeId: p.storeId,
+    storeName: p.storeName, receiptNo: p.receiptNo, amount: p.amount,
+    photo: p.photo, photoType: p.photoType, via: "영수증폼"
+  });
+  if (!receipt.ok) return json_({ result: "error", message: receipt.message });
+  return json_({ result: "ok", name: maskName_(found[1]), receipt: receipt });
+}
+
+// 매장: 전화번호 조회
+function handleStaffLookup_(p) {
+  if (p.staffToken !== props_().getProperty("STAFF_TOKEN")) return json_({ result: "error", message: "unauthorized" });
+  var phone = String(p.phone || "").trim();
+  var found = findMember_(phone);
+  if (!found[0]) return json_({ result: "ok", exists: false });
+
+  var sh = sheet_(SHEET_MEMBER);
+  return json_({
+    result: "ok", exists: true,
+    name: maskName_(found[1]),
+    balance: getBalance_(phone),
+    pending: getPending_(phone),
+    joinedAt: toIso_(sh.getRange(found[0], 1).getValue()).slice(0, 10),
+    visitCount: sh.getRange(found[0], 13).getValue()
+  });
+}
+
+// 매장: 영수증 적립 등록
+function handleStaffEarn_(p) {
+  if (p.staffToken !== props_().getProperty("STAFF_TOKEN")) return json_({ result: "error", message: "unauthorized" });
+  var phone = String(p.phone || "").trim();
+  var found = findMember_(phone);
+  if (!found[0]) return json_({ result: "error", message: "가입되지 않은 번호입니다" });
+
+  var receipt = addReceipt_({
+    phone: phone, name: found[1], brand: p.brand, storeId: p.storeId,
+    storeName: p.storeName, receiptNo: p.receiptNo, amount: p.amount,
+    photo: p.photo, photoType: p.photoType, via: "매장"
+  });
+  if (!receipt.ok) return json_({ result: "error", message: receipt.message });
+  return json_({ result: "ok", receipt: receipt, balance: getBalance_(phone) });
+}
+
+// 매장: 마일리지 차감 (에누리)
+function handleStaffRedeem_(p) {
+  if (p.staffToken !== props_().getProperty("STAFF_TOKEN")) return json_({ result: "error", message: "unauthorized" });
+  var phone = String(p.phone || "").trim();
+  var found = findMember_(phone);
+  if (!found[0]) return json_({ result: "error", message: "가입되지 않은 번호입니다" });
+
+  var amt = Math.round(Number(String(p.amount || "").replace(/[^0-9]/g, "")));
+  if (!amt || amt <= 0) return json_({ result: "error", message: "차감 금액 오류" });
+
+  var bal = getBalance_(phone);
+  if (amt > bal) return json_({ result: "error", message: "잔액 부족 (현재 " + bal + "P)" });
+
+  sheet_(SHEET_POINT).appendRow([
+    new Date(), phone, found[1], "사용", -amt, "",
+    String(p.storeId || ""), String(p.storeName || ""),
+    "매장 에누리 차감" + (p.memo ? " / " + String(p.memo).slice(0, 50) : "")
+  ]);
+  return json_({ result: "ok", used: amt, balance: bal - amt });
+}
+
 // ─────────────────────────────────────────────
-// GET: 관리자 조회 (admin.html에서 호출, 토큰 필수)
+// GET (관리자)
 // ─────────────────────────────────────────────
 function doGet(e) {
   var action = (e.parameter.action || "").toLowerCase();
   if (action === "ping") return json_({ result: "ok" });
 
-  var token = PropertiesService.getScriptProperties().getProperty("ADMIN_TOKEN");
-  if (!token || e.parameter.token !== token) {
-    return json_({ result: "error", message: "unauthorized" });
-  }
+  var token = props_().getProperty("ADMIN_TOKEN");
+  if (!token || e.parameter.token !== token) return json_({ result: "error", message: "unauthorized" });
 
   if (action === "list") {
-    var sh = getSheet_();
+    var sh = sheet_(SHEET_MEMBER);
     var last = sh.getLastRow();
     var rows = [];
     if (last >= 2) {
+      var bmap = balanceMap_();
       var vals = sh.getRange(2, 1, last - 1, 13).getValues();
       rows = vals.map(function (v) {
+        var ph = String(v[5]);
         return {
           joinedAt: toIso_(v[0]), brand: v[1], storeId: v[2], storeName: v[3],
-          name: v[4], phone: String(v[5]), birth: String(v[6]), gender: v[7],
+          name: v[4], phone: ph, birth: String(v[6]), gender: v[7],
           consentPrivacy: v[8], consentMarketing: v[9],
-          lastVisit: toIso_(v[11]), visitCount: v[12]
+          lastVisit: toIso_(v[11]), visitCount: v[12],
+          balance: bmap[ph] || 0
         };
       });
     }
     return json_({ result: "ok", rows: rows });
   }
 
+  if (action === "receipts") {
+    var sh2 = sheet_(SHEET_RECEIPT);
+    var last2 = sh2.getLastRow();
+    var rows2 = [];
+    if (last2 >= 2) {
+      var vals2 = sh2.getRange(2, 1, last2 - 1, 14).getValues();
+      rows2 = vals2.map(function (v) {
+        return {
+          submittedAt: toIso_(v[0]), phone: String(v[1]), name: v[2],
+          brand: v[3], storeName: v[5], receiptNo: String(v[6]),
+          amount: v[7], points: v[8], dueDate: toIso_(v[9]).slice(0, 10),
+          status: v[10], confirmedAt: toIso_(v[11]), photoUrl: v[12], via: v[13]
+        };
+      });
+    }
+    return json_({ result: "ok", rows: rows2 });
+  }
+
   return json_({ result: "error", message: "unknown action" });
 }
 
 function toIso_(v) {
-  if (v instanceof Date) {
-    return Utilities.formatDate(v, "Asia/Seoul", "yyyy-MM-dd'T'HH:mm:ss");
-  }
+  if (v instanceof Date) return Utilities.formatDate(v, "Asia/Seoul", "yyyy-MM-dd'T'HH:mm:ss");
   return String(v || "");
 }
 

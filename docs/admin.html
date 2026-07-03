@@ -82,7 +82,7 @@
       <table>
         <thead><tr>
           <th>가입일시</th><th>브랜드</th><th>매장</th><th>이름</th><th>휴대전화</th>
-          <th>생년월일</th><th>성별</th><th>마케팅동의</th><th>최근방문</th><th>방문횟수</th>
+          <th>생년월일</th><th>성별</th><th>마케팅동의</th><th>최근방문</th><th>방문횟수</th><th>마일리지</th>
         </tr></thead>
         <tbody id="tbody"><tr><td colspan="10" class="empty">데이터를 불러오는 중...</td></tr></tbody>
       </table>
@@ -196,14 +196,15 @@ function renderTable() {
     <td><span class="pill ${r.consentMarketing==="Y"?"y":"n"}">${r.consentMarketing==="Y"?"동의":"미동의"}</span></td>
     <td>${String(r.lastVisit||"").slice(0,10)}</td>
     <td>${r.visitCount||1}</td>
+    <td><b>${Number(r.balance||0).toLocaleString()}P</b></td>
   </tr>`).join("");
 }
 
 function downloadCsv() {
-  const header = ["가입일시","브랜드","매장코드","매장","이름","휴대전화","생년월일","성별","개인정보동의","마케팅동의","최근방문","방문횟수"];
+  const header = ["가입일시","브랜드","매장코드","매장","이름","휴대전화","생년월일","성별","개인정보동의","마케팅동의","최근방문","방문횟수","마일리지"];
   const lines = [header.join(",")].concat(ROWS.map(r => [
     String(r.joinedAt).slice(0,19).replace("T"," "), r.brand, r.storeId, r.storeName, r.name, r.phone,
-    r.birth, r.gender, r.consentPrivacy, r.consentMarketing, String(r.lastVisit||"").slice(0,10), r.visitCount||1
+    r.birth, r.gender, r.consentPrivacy, r.consentMarketing, String(r.lastVisit||"").slice(0,10), r.visitCount||1, r.balance||0
   ].map(v => `"${String(v==null?"":v).replace(/"/g,'""')}"`).join(",")));
   const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
