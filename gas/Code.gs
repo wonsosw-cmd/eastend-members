@@ -11,6 +11,9 @@ var SHEET_RECEIPT = "영수증";
 var SHEET_POINT = "포인트";
 var EARN_RATE = 0.01;      // 적립률 1%
 var EARN_DELAY_DAYS = 7;   // 제출 후 확정까지 일수
+var REDEEM_MIN = 5000;     // 최소 사용 포인트
+var REDEEM_UNIT = 1000;    // 사용 단위
+var EXPIRE_DAYS = 365;     // 적립 후 소멸까지 일수 (1년)
 
 // ─────────────────────────────────────────────
 // 최초 1회: 시트 준비 + 관리자 토큰
@@ -205,25 +208,58 @@ function addReceipt_(o) {
 }
 
 // ─────────────────────────────────────────────
-// 매일 새벽: 7일 지난 대기 영수증 → 포인트 확정
+// 매일 새벽: 7일 지난 대기 영수증 → 포인트 확정 + 1년 경과 포인트 소멸
 // ─────────────────────────────────────────────
 function confirmReceipts() {
   var sh = sheet_(SHEET_RECEIPT);
   var last = sh.getLastRow();
+  var now = new Date();
+  if (last >= 2) {
+    var vals = sh.getRange(2, 1, last - 1, 11).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      var status = String(vals[i][10]);
+      var due = vals[i][9];
+      if (status === "대기" && due instanceof Date && due <= now) {
+        var row = i + 2;
+        sheet_(SHEET_POINT).appendRow([
+          now, vals[i][1], vals[i][2], "적립", Number(vals[i][8]) || 0,
+          String(vals[i][6]), vals[i][4], vals[i][5], "영수증 적립 자동확정"
+        ]);
+        sh.getRange(row, 11).setValue("확정");
+        sh.getRange(row, 12).setValue(now);
+      }
+    }
+  }
+  expirePoints();
+}
+
+// 적립 후 1년(EXPIRE_DAYS) 경과한 미사용 포인트 자동 소멸 (선입선출 방식)
+function expirePoints() {
+  var sh = sheet_(SHEET_POINT);
+  var last = sh.getLastRow();
   if (last < 2) return;
   var now = new Date();
-  var vals = sh.getRange(2, 1, last - 1, 11).getValues();
+  var cutoff = new Date(now.getTime() - EXPIRE_DAYS * 86400000);
+  var vals = sh.getRange(2, 1, last - 1, 5).getValues(); // A일시~E포인트
+
+  // 전화번호별: 1년 지난 적립 누계 vs 사용·소멸 누계 (선입선출: 사용분은 오래된 적립부터 차감된 것으로 간주)
+  var oldEarn = {}, spent = {}, names = {};
   for (var i = 0; i < vals.length; i++) {
-    var status = String(vals[i][10]);
-    var due = vals[i][9];
-    if (status === "대기" && due instanceof Date && due <= now) {
-      var row = i + 2;
-      sheet_(SHEET_POINT).appendRow([
-        now, vals[i][1], vals[i][2], "적립", Number(vals[i][8]) || 0,
-        String(vals[i][6]), vals[i][4], vals[i][5], "영수증 적립 자동확정"
-      ]);
-      sh.getRange(row, 11).setValue("확정");
-      sh.getRange(row, 12).setValue(now);
+    var ph = String(vals[i][1]).trim();
+    var pts = Number(vals[i][4]) || 0;
+    names[ph] = names[ph] || String(vals[i][2] || "");
+    if (pts > 0) {
+      var d = vals[i][0];
+      if (d instanceof Date && d <= cutoff) oldEarn[ph] = (oldEarn[ph] || 0) + pts;
+    } else if (pts < 0) {
+      spent[ph] = (spent[ph] || 0) + (-pts);
+    }
+  }
+  for (var ph2 in oldEarn) {
+    var toExpire = oldEarn[ph2] - (spent[ph2] || 0);
+    if (toExpire > 0) {
+      sh.appendRow([now, ph2, names[ph2], "소멸", -toExpire, "", "", "",
+        "적립 후 " + EXPIRE_DAYS + "일 경과 자동 소멸"]);
     }
   }
 }
@@ -356,12 +392,15 @@ function handleStaffEarn_(p) {
 // 매장: 마일리지 차감 (에누리)
 function handleStaffRedeem_(p) {
   if (p.staffToken !== props_().getProperty("STAFF_TOKEN")) return json_({ result: "error", message: "unauthorized" });
-  var phone = String(p.phone || "").trim();
-  var found = findMember_(phone);
-  if (!found[0]) return json_({ result: "error", message: "가입되지 않은 번호입니다" });
 
   var amt = Math.round(Number(String(p.amount || "").replace(/[^0-9]/g, "")));
   if (!amt || amt <= 0) return json_({ result: "error", message: "차감 금액 오류" });
+  if (amt < REDEEM_MIN) return json_({ result: "error", message: REDEEM_MIN.toLocaleString() + "P부터 사용 가능합니다" });
+  if (amt % REDEEM_UNIT !== 0) return json_({ result: "error", message: REDEEM_UNIT.toLocaleString() + "P 단위로만 사용 가능합니다" });
+
+  var phone = String(p.phone || "").trim();
+  var found = findMember_(phone);
+  if (!found[0]) return json_({ result: "error", message: "가입되지 않은 번호입니다" });
 
   var bal = getBalance_(phone);
   if (amt > bal) return json_({ result: "error", message: "잔액 부족 (현재 " + bal + "P)" });
