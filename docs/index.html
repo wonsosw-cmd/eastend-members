@@ -73,18 +73,7 @@
   .terms table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
   .terms th, .terms td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; background: #fff; }
   .terms th { background: #f1f3f6; white-space: nowrap; font-weight: 600; }
-  /* 영수증 적립 (선택) */
-  .receipt-box { border: 1.5px dashed var(--line); border-radius: 12px; padding: 16px; background: #fbfcfd; }
-  .receipt-box .desc { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
-  .receipt-box .desc b { color: var(--brand); }
-  .photo-btn {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    width: 100%; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px;
-    background: #fff; font-size: 14px; font-weight: 600; color: var(--muted);
-    cursor: pointer; font-family: inherit;
-  }
-  .photo-btn.has { border-color: var(--teal); color: var(--teal); }
-  #rPhotoPreview { display: none; width: 100%; max-height: 180px; object-fit: contain; border-radius: 10px; margin-top: 10px; background: #f1f3f6; }
+  .consent-note { font-size: 12px; color: var(--muted); line-height: 1.5; margin: -4px 0 10px; }
   .submit-btn {
     width: 100%; margin-top: 24px; padding: 16px; border: none; border-radius: 12px;
     background: var(--brand); color: #fff; font-size: 16.5px; font-weight: 700; font-family: inherit;
@@ -134,9 +123,9 @@
         <div class="err" id="errPhone">올바른 휴대전화번호를 입력해주세요.</div>
       </div>
       <div class="field">
-        <label>생년월일 (선택)</label>
+        <label>생년월일 <b>*</b></label>
         <input type="text" id="fBirth" placeholder="예: 900101 (6자리)" inputmode="numeric" maxlength="6">
-        <div class="err" id="errBirth">생년월일 6자리(YYMMDD)를 확인해주세요.</div>
+        <div class="err" id="errBirth">생년월일 6자리(YYMMDD)를 입력해주세요.</div>
       </div>
       <div class="field">
         <label>성별 (선택)</label>
@@ -146,29 +135,13 @@
         </div>
       </div>
 
-      <div class="sec-title">영수증 적립 (선택)</div>
-      <div class="receipt-box">
-        <div class="desc">오늘 구매하신 영수증을 등록하면 <b>결제금액의 1%</b>가 구매 7일 후 자동 적립됩니다.</div>
-        <div class="field">
-          <label>영수증 번호</label>
-          <input type="text" id="rNo" placeholder="영수증 하단의 번호" maxlength="30">
-        </div>
-        <div class="field">
-          <label>결제 금액</label>
-          <input type="tel" id="rAmt" placeholder="예: 59,000" inputmode="numeric" maxlength="11">
-        </div>
-        <input type="file" id="rPhoto" accept="image/*" capture="environment" style="display:none;">
-        <button type="button" class="photo-btn" id="rPhotoBtn" onclick="document.getElementById('rPhoto').click()">📷 영수증 사진 촬영/첨부</button>
-        <img id="rPhotoPreview" alt="영수증 미리보기">
-        <div class="err" id="errReceipt">영수증 번호와 결제 금액을 함께 입력해주세요.</div>
-      </div>
-
       <div class="sec-title">약관 동의</div>
+      <div class="consent-note">아래 항목을 각각 구분하여 동의받습니다. 선택 항목에 동의하지 않으셔도 멤버십 가입이 가능합니다.</div>
       <div class="consent-box">
         <div class="consent-all" onclick="toggleAll(event)">
           <input type="checkbox" id="cAll">
           <span>전체 동의</span>
-          <span class="hint">한 번에 동의하고 시작하기</span>
+          <span class="hint">편의 기능 · 항목별 해제 가능</span>
         </div>
         <div class="consent-row" onclick="rowClick(event,'cPrivacy')">
           <input type="checkbox" id="cPrivacy">
@@ -178,12 +151,25 @@
         <div class="terms" id="tPrivacy">
           <b>개인정보 수집·이용 동의 (필수)</b>
           <table>
-            <tr><th>수집 목적</th><td>멤버십 회원 관리, 구매 혜택 제공, 매장 방문 이력 관리, 고객 상담 대응</td></tr>
-            <tr><th>수집 항목</th><td>이름, 휴대전화번호, 가입 매장, 가입 일시 / (선택) 생년월일, 성별</td></tr>
-            <tr><th>보유 기간</th><td>회원 탈퇴 또는 동의 철회 시까지 (관계 법령에 따라 보존이 필요한 경우 해당 기간까지)</td></tr>
+            <tr><th>수집·이용 목적</th><td>멤버십 회원 가입·관리, 본인확인, 구매금액 적립 및 혜택 제공, 매장 방문·구매 이력 관리, 고객 문의·상담 대응</td></tr>
+            <tr><th>수집 항목</th><td>(필수) 이름, 휴대전화번호, 생년월일, 가입 매장, 가입 일시<br>(선택) 성별, 영수증 번호, 결제금액, 영수증 이미지, 구매·적립 내역</td></tr>
+            <tr><th>보유·이용 기간</th><td>회원 탈퇴 또는 동의 철회 시까지 (관계 법령에 따라 보존이 필요한 경우 해당 기간까지 보관 후 지체 없이 파기)</td></tr>
           </table>
-          귀하는 개인정보 수집·이용에 동의하지 않을 권리가 있습니다. 다만 필수 항목 동의를 거부할 경우 멤버십 가입이 제한됩니다.
+          귀하는 개인정보 수집·이용에 동의하지 않을 권리가 있습니다. 다만 필수 항목에 동의하지 않으실 경우 멤버십 가입이 제한됩니다.
+          필수 최소정보 외의 선택 항목은 동의하지 않으셔도 가입에 제한이 없습니다.
           동의 철회 및 개인정보 관련 문의는 매장 직원 또는 고객센터를 통해 요청하실 수 있습니다.
+          <br><br><b>개인정보 처리 위탁 안내</b><br>
+          당사는 원활한 멤버십 서비스 제공을 위해 아래와 같이 개인정보 처리 업무를 위탁하고 있으며, 관계 법령에 따라 수탁자를 관리·감독합니다.
+          <table>
+            <tr><th>수탁자</th><td>위탁 업무 내용</td></tr>
+            <tr><th>각 매장 운영사업자(매장 매니저)</th><td>매장 멤버십 회원 응대, 적립·혜택 처리, 고객 문의 대응</td></tr>
+            <tr><th>(해당 시) 메시지 발송 대행사</th><td>안내성·광고성 메시지(SMS·알림톡) 발송</td></tr>
+          </table>
+          · 위탁 업무 내용 및 수탁자는 당사 홈페이지 개인정보 처리방침에 지속적으로 게재됩니다.<br>
+          · 마케팅(홍보·판매권유) 업무를 위탁하는 경우 그 내용과 수탁자를 회원께 알려드립니다.
+          <br><br><b>만 14세 미만 아동 안내</b><br>
+          · 당사는 만 14세 미만 아동의 개인정보를 처리하는 경우 법정대리인의 동의를 받습니다.<br>
+          · 가입자가 만 14세 미만인 경우, 매장 직원의 안내에 따라 법정대리인 동의 절차를 진행해 주시기 바랍니다.
         </div>
         <div class="consent-row mkt" onclick="rowClick(event,'cMkt')">
           <input type="checkbox" id="cMkt">
@@ -193,12 +179,25 @@
         <div class="terms" id="tMkt">
           <b>마케팅 정보 수신 동의 (선택)</b><br>
           신상품 소식, 할인 행사, 쿠폰 등 광고성 정보를 SMS·카카오톡으로 받아보실 수 있습니다.
-          동의하지 않으셔도 멤버십 가입에는 제한이 없으며, 수신 동의는 언제든지 철회할 수 있습니다.
           <table>
-            <tr><th>이용 목적</th><td>신상품·이벤트·할인 혜택 등 광고성 정보 전송</td></tr>
+            <tr><th>이용 목적</th><td>신상품·이벤트·할인·쿠폰 등 광고성 정보 전송</td></tr>
             <tr><th>이용 항목</th><td>이름, 휴대전화번호</td></tr>
-            <tr><th>보유 기간</th><td>수신 동의 철회 또는 회원 탈퇴 시까지</td></tr>
+            <tr><th>전송 매체</th><td>SMS(문자메시지), 카카오톡(알림톡·친구톡)</td></tr>
+            <tr><th>보유·이용 기간</th><td>수신 동의 철회 또는 회원 탈퇴 시까지</td></tr>
           </table>
+          · 동의하지 않으셔도 멤버십 가입에는 제한이 없으며, 수신 동의는 언제든지 무료로 철회할 수 있습니다.<br>
+          · 광고성 정보 전송 시 (광고) 표기, 전송자 명칭〔(주)이스트엔드 / 시티브리즈·아티드〕, 수신거부 방법을 함께 안내합니다.<br>
+          · 수신 동의일부터 2년마다 수신 동의 유지 여부를 확인해 드립니다.
+        </div>
+        <div class="consent-row mkt" onclick="rowClick(event,'cNight')">
+          <input type="checkbox" id="cNight">
+          <span class="txt"><span class="tag opt">[선택]</span> 야간 광고 수신 동의 (오후 9시~익일 오전 8시)</span>
+          <button type="button" class="view" onclick="toggleTerms(event,'tNight')">보기</button>
+        </div>
+        <div class="terms" id="tNight">
+          <b>야간 광고 수신 동의 (선택)</b><br>
+          · 오후 9시부터 다음 날 오전 8시까지 광고성 정보를 받아보시려면 별도 동의가 필요합니다.<br>
+          · 야간 수신에 동의하지 않으시면 해당 시간대에는 광고성 정보를 발송하지 않습니다.
         </div>
       </div>
       <div class="err" id="errConsent">필수 약관에 동의해주세요.</div>
@@ -260,39 +259,6 @@ document.getElementById("fPhone").addEventListener("input", e => {
 document.getElementById("fBirth").addEventListener("input", e => {
   e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
 });
-// 결제금액 콤마 표시
-document.getElementById("rAmt").addEventListener("input", e => {
-  const v = e.target.value.replace(/\D/g, "").slice(0, 8);
-  e.target.value = v ? Number(v).toLocaleString() : "";
-});
-
-// 영수증 사진: 촬영 후 1280px JPEG로 압축 (업로드 용량 절감)
-let photoB64 = "", photoType = "";
-document.getElementById("rPhoto").addEventListener("change", async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    const img = await new Promise((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i); i.onerror = rej;
-      i.src = URL.createObjectURL(file);
-    });
-    const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
-    const cv = document.createElement("canvas");
-    cv.width = Math.round(img.width * scale);
-    cv.height = Math.round(img.height * scale);
-    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
-    const dataUrl = cv.toDataURL("image/jpeg", 0.72);
-    photoB64 = dataUrl.split(",")[1];
-    photoType = "image/jpeg";
-    const prev = document.getElementById("rPhotoPreview");
-    prev.src = dataUrl; prev.style.display = "block";
-    const btn = document.getElementById("rPhotoBtn");
-    btn.classList.add("has"); btn.textContent = "✓ 사진 첨부됨 (다시 찍기)";
-  } catch (err) {
-    alert("사진 처리에 실패했습니다. 다시 시도해주세요.");
-  }
-});
 
 function rowClick(ev, id) {
   if (ev.target.tagName === "BUTTON" || ev.target.tagName === "INPUT") { syncAll(); return; }
@@ -303,15 +269,18 @@ function rowClick(ev, id) {
 function toggleAll(ev) {
   const all = document.getElementById("cAll");
   if (ev.target.tagName !== "INPUT") all.checked = !all.checked;
-  document.getElementById("cPrivacy").checked = all.checked;
-  document.getElementById("cMkt").checked = all.checked;
+  ["cPrivacy", "cMkt", "cNight"].forEach(id => document.getElementById(id).checked = all.checked);
 }
 function syncAll() {
+  // 야간 수신은 마케팅 수신 동의가 전제
+  if (document.getElementById("cNight").checked && !document.getElementById("cMkt").checked) {
+    document.getElementById("cMkt").checked = true;
+  }
   document.getElementById("cAll").checked =
-    document.getElementById("cPrivacy").checked && document.getElementById("cMkt").checked;
+    ["cPrivacy", "cMkt", "cNight"].every(id => document.getElementById(id).checked);
 }
-document.getElementById("cPrivacy").addEventListener("change", syncAll);
-document.getElementById("cMkt").addEventListener("change", syncAll);
+["cPrivacy", "cMkt", "cNight"].forEach(id =>
+  document.getElementById(id).addEventListener("change", syncAll));
 function toggleTerms(ev, id) {
   ev.stopPropagation();
   document.getElementById(id).classList.toggle("open");
@@ -326,19 +295,14 @@ async function submitJoin() {
   const gender = (document.querySelector('input[name=fGender]:checked') || {}).value || "";
   const okPrivacy = document.getElementById("cPrivacy").checked;
   const okMkt = document.getElementById("cMkt").checked;
-
-  const rNo = document.getElementById("rNo").value.trim();
-  const rAmt = document.getElementById("rAmt").value.replace(/\D/g, "");
+  const okNight = document.getElementById("cNight").checked;
 
   let bad = false;
   showErr("errName", !name); bad = bad || !name;
   const phoneOk = /^01[016789]-\d{3,4}-\d{4}$/.test(phone);
   showErr("errPhone", !phoneOk); bad = bad || !phoneOk;
-  const birthOk = !birth || /^\d{6}$/.test(birth);
+  const birthOk = /^\d{6}$/.test(birth);
   showErr("errBirth", !birthOk); bad = bad || !birthOk;
-  // 영수증은 선택이지만, 입력하려면 번호+금액 둘 다 필요
-  const rBad = (rNo || rAmt || photoB64) && (!rNo || !rAmt);
-  showErr("errReceipt", rBad); bad = bad || rBad;
   showErr("errConsent", !okPrivacy); bad = bad || !okPrivacy;
   if (!store) { alert("가입 매장을 선택해주세요."); bad = true; }
   if (bad) return;
@@ -352,14 +316,9 @@ async function submitJoin() {
     action: "join",
     storeId: store.id, storeName: store.name, brand: store.brandKo,
     name, phone, birth, gender,
-    consentPrivacy: okPrivacy, consentMarketing: okMkt,
+    consentPrivacy: okPrivacy, consentMarketing: okMkt, consentNight: okNight,
     ua: navigator.userAgent,
   };
-  if (rNo && rAmt) {
-    payload.receiptNo = rNo;
-    payload.receiptAmount = rAmt;
-    if (photoB64) { payload.photo = photoB64; payload.photoType = photoType; }
-  }
 
   const loading = document.getElementById("loading");
   const btn = document.getElementById("btnSubmit");
@@ -381,14 +340,8 @@ async function submitJoin() {
       document.getElementById("doneTitle").textContent = "이미 가입된 회원입니다";
       document.getElementById("doneMsg").innerHTML = "방문 정보가 업데이트되었습니다.<br>멤버십 혜택은 매장 직원에게 문의해주세요.";
     }
-    if (j.receipt) {
-      const m = document.getElementById("doneMsg");
-      if (j.receipt.ok) {
-        m.innerHTML += `<br><br>🧾 영수증 접수 완료! <b>${j.receipt.points.toLocaleString()}P</b>가<br>${j.receipt.dueDate}에 자동 적립됩니다.`;
-      } else {
-        m.innerHTML += `<br><br>⚠️ 영수증 접수 실패: ${j.receipt.message}`;
-      }
-    }
+    document.getElementById("doneMsg").innerHTML +=
+      "<br><br>🧾 오늘 구매 영수증이 있다면 매장 직원에게<br>영수증 적립(1%)을 요청해주세요!";
     window.scrollTo(0, 0);
   } catch (err) {
     alert("가입 처리 중 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.\n(" + err.message + ")");

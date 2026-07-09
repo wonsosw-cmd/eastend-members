@@ -22,7 +22,7 @@ function setup() {
     sh.appendRow([
       "가입일시", "브랜드", "매장코드", "매장명", "이름", "휴대전화",
       "생년월일", "성별", "개인정보동의", "마케팅동의", "동의일시",
-      "최근방문", "방문횟수", "UserAgent"
+      "최근방문", "방문횟수", "UserAgent", "야간광고동의"
     ]);
     sh.setFrozenRows(1);
   }
@@ -272,6 +272,9 @@ function handleJoin_(p) {
       sh.getRange(found[0], 10).setValue("Y");
       sh.getRange(found[0], 11).setValue(now);
     }
+    if (p.consentNight === true) {
+      sh.getRange(found[0], 15).setValue("Y");
+    }
     status = "existing";
     name = found[1]; // 시트 등록명 기준
   } else {
@@ -279,7 +282,8 @@ function handleJoin_(p) {
       now, String(p.brand || ""), String(p.storeId || ""), String(p.storeName || ""),
       name, phone, String(p.birth || ""), String(p.gender || ""),
       "Y", p.consentMarketing === true ? "Y" : "N", now, now, 1,
-      String(p.ua || "").slice(0, 200)
+      String(p.ua || "").slice(0, 200),
+      p.consentNight === true ? "Y" : "N"
     ]);
     var r = sh.getLastRow();
     sh.getRange(r, 6, 1, 2).setNumberFormat("@");
