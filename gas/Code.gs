@@ -10,7 +10,6 @@ var SHEET_MEMBER = "회원";
 var SHEET_RECEIPT = "영수증";
 var SHEET_POINT = "포인트";
 var EARN_RATE = 0.01;      // 적립률 1%
-var EARN_DELAY_DAYS = 7;   // 제출 후 확정까지 일수
 var REDEEM_MIN = 5000;     // 최소 사용 포인트
 var REDEEM_UNIT = 1000;    // 사용 단위
 var EXPIRE_DAYS = 365;     // 적립 후 소멸까지 일수 (1년)
@@ -184,7 +183,7 @@ function savePhoto_(b64, mime, receiptNo) {
   }
 }
 
-// 영수증 등록 공통
+// 영수증 등록 공통 — 등록 즉시 포인트 적립
 function addReceipt_(o) {
   var no = String(o.receiptNo || "").trim();
   var amt = Math.round(Number(String(o.amount || "").replace(/[^0-9]/g, "")));
@@ -194,21 +193,26 @@ function addReceipt_(o) {
 
   var pts = Math.floor(amt * EARN_RATE);
   var now = new Date();
-  var due = new Date(now.getTime() + EARN_DELAY_DAYS * 86400000);
   var photoUrl = savePhoto_(o.photo, o.photoType, no);
 
   sheet_(SHEET_RECEIPT).appendRow([
     now, o.phone, o.name, o.brand || "", o.storeId || "", o.storeName || "",
-    no, amt, pts, due, "대기", "", photoUrl, o.via || "", ""
+    no, amt, pts, now, "확정", now, photoUrl, o.via || "", ""
   ]);
   var r = sheet_(SHEET_RECEIPT).getLastRow();
   sheet_(SHEET_RECEIPT).getRange(r, 7).setNumberFormat("@"); // 영수증번호 텍스트
 
-  return { ok: true, points: pts, dueDate: Utilities.formatDate(due, "Asia/Seoul", "yyyy-MM-dd") };
+  sheet_(SHEET_POINT).appendRow([
+    now, o.phone, o.name, "적립", pts,
+    no, o.storeId || "", o.storeName || "", "영수증 즉시 적립"
+  ]);
+
+  return { ok: true, points: pts, immediate: true };
 }
 
 // ─────────────────────────────────────────────
-// 매일 새벽: 7일 지난 대기 영수증 → 포인트 확정 + 1년 경과 포인트 소멸
+// 매일 새벽 트리거: 1년 경과 포인트 소멸
+// (즉시 적립으로 전환되어 '대기' 확정 처리는 없음 — 과거 대기 건이 있으면 함께 확정)
 // ─────────────────────────────────────────────
 function confirmReceipts() {
   var sh = sheet_(SHEET_RECEIPT);
@@ -217,13 +221,11 @@ function confirmReceipts() {
   if (last >= 2) {
     var vals = sh.getRange(2, 1, last - 1, 11).getValues();
     for (var i = 0; i < vals.length; i++) {
-      var status = String(vals[i][10]);
-      var due = vals[i][9];
-      if (status === "대기" && due instanceof Date && due <= now) {
+      if (String(vals[i][10]) === "대기") {
         var row = i + 2;
         sheet_(SHEET_POINT).appendRow([
           now, vals[i][1], vals[i][2], "적립", Number(vals[i][8]) || 0,
-          String(vals[i][6]), vals[i][4], vals[i][5], "영수증 적립 자동확정"
+          String(vals[i][6]), vals[i][4], vals[i][5], "과거 대기분 확정"
         ]);
         sh.getRange(row, 11).setValue("확정");
         sh.getRange(row, 12).setValue(now);

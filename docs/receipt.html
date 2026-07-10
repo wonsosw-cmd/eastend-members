@@ -37,7 +37,7 @@
 <div class="wrap">
   <div class="hero">
     <h1>🧾 영수증 적립 신청</h1>
-    <p>구매 영수증을 등록하면 결제금액의 1%가<br>구매 7일 후 마일리지로 자동 적립됩니다.<br>(5,000P부터 1,000P 단위 사용 · 적립 후 1년 경과 시 소멸)</p>
+    <p>구매 영수증을 등록하면 결제금액의 1%가<br>마일리지로 즉시 적립됩니다.<br>(5,000P부터 1,000P 단위 사용 · 적립 후 1년 경과 시 소멸)</p>
   </div>
   <div class="body">
     <div class="field"><label>휴대전화번호 (가입 번호)</label><input type="tel" id="phone" placeholder="010-0000-0000" inputmode="numeric" maxlength="13"></div>
@@ -124,7 +124,7 @@ async function submitReceipt() {
     });
     const j = await res.json();
     if (j.result !== "ok") throw new Error(j.message);
-    setMsg(j.name + "님, 접수 완료! " + j.receipt.points.toLocaleString() + "P가 " + j.receipt.dueDate + "에 적립됩니다.", true);
+    setMsg(j.name + "님, " + j.receipt.points.toLocaleString() + "P가 즉시 적립되었습니다!", true);
     document.getElementById("rNo").value = ""; document.getElementById("rAmt").value = "";
   } catch (e) {
     setMsg("접수 실패: " + e.message, false);

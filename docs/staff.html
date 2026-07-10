@@ -73,8 +73,7 @@
         <div class="member-name" id="mName">-</div>
         <div class="member-sub" id="mSub">-</div>
         <div class="bal-row">
-          <div class="bal"><div class="k">사용 가능</div><div class="v point" id="mBal">0P</div></div>
-          <div class="bal"><div class="k">적립 대기</div><div class="v" id="mPending">0P</div></div>
+          <div class="bal"><div class="k">사용 가능 마일리지</div><div class="v point" id="mBal">0P</div></div>
         </div>
         <div class="note">※ 고객 성함을 확인한 뒤 진행해주세요.</div>
       </div>
@@ -87,7 +86,7 @@
         <div class="panel on" id="panelEarn">
           <div class="field"><label>영수증 번호</label><input type="text" id="eNo" maxlength="30" placeholder="영수증 하단의 번호"></div>
           <div class="field"><label>결제 금액</label><input type="tel" id="eAmt" inputmode="numeric" maxlength="11" placeholder="예: 59,000"></div>
-          <button class="btn teal" id="btnEarn" onclick="earn()">적립 등록 (7일 후 1% 적립)</button>
+          <button class="btn teal" id="btnEarn" onclick="earn()">적립 등록 (1% 즉시 적립)</button>
           <div class="msg" id="earnMsg"></div>
         </div>
         <div class="panel" id="panelUse">
@@ -181,7 +180,6 @@ async function lookup() {
     document.getElementById("mName").textContent = j.name + " 고객님";
     document.getElementById("mSub").textContent = "가입일 " + j.joinedAt + " · 방문 " + j.visitCount + "회";
     document.getElementById("mBal").textContent = Number(j.balance).toLocaleString() + "P";
-    document.getElementById("mPending").textContent = Number(j.pending).toLocaleString() + "P";
     document.getElementById("memberCard").style.display = "block";
     document.getElementById("actionArea").style.display = "block";
     setMsg("lookupMsg", "", true);
@@ -206,7 +204,8 @@ async function earn() {
   try {
     const j = await api({ action: "staff_earn", phone: CUR_PHONE, receiptNo: no, amount: amt });
     if (j.result !== "ok") throw new Error(j.message);
-    setMsg("earnMsg", "접수 완료! " + j.receipt.points.toLocaleString() + "P가 " + j.receipt.dueDate + "에 적립됩니다.", true);
+    document.getElementById("mBal").textContent = Number(j.balance).toLocaleString() + "P";
+    setMsg("earnMsg", j.receipt.points.toLocaleString() + "P 즉시 적립 완료! 잔액 " + Number(j.balance).toLocaleString() + "P", true);
     document.getElementById("eNo").value = ""; document.getElementById("eAmt").value = "";
   } catch (e) { setMsg("earnMsg", "실패: " + e.message, false); }
   finally { btn.disabled = false; }
