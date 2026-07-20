@@ -9,7 +9,8 @@
 var SHEET_MEMBER = "회원";
 var SHEET_RECEIPT = "영수증";
 var SHEET_POINT = "포인트";
-var EARN_RATE = 0.01;      // 적립률 1%
+var EARN_RATE = 0.01;        // 적립률 1%
+var WELCOME_POINTS = 3000;   // 신규가입 축하 적립
 var REDEEM_MIN = 5000;     // 최소 사용 포인트
 var REDEEM_UNIT = 1000;    // 사용 단위
 var EXPIRE_DAYS = 365;     // 적립 후 소멸까지 일수 (1년)
@@ -100,6 +101,14 @@ function maskName_(name) {
   if (s.length <= 1) return s;
   if (s.length === 2) return s.charAt(0) + "*";
   return s.charAt(0) + Array(s.length - 1).join("*") + s.charAt(s.length - 1);
+}
+
+// 가입 당일 여부 확인 (영수증 적립은 가입 익일부터 허용)
+function joinedToday_(memberRow) {
+  var joined = sheet_(SHEET_MEMBER).getRange(memberRow, 1).getValue();
+  if (!(joined instanceof Date)) return false;
+  var fmt = function (d) { return Utilities.formatDate(d, "Asia/Seoul", "yyyyMMdd"); };
+  return fmt(joined) === fmt(new Date());
 }
 
 // 회원 찾기: [행번호, 이름] (없으면 행번호 0)
@@ -326,16 +335,19 @@ function handleJoin_(p) {
     var r = sh.getLastRow();
     sh.getRange(r, 6, 1, 2).setNumberFormat("@");
     status = "new";
+    // 신규가입 축하 포인트 즉시 지급
+    if (WELCOME_POINTS > 0) {
+      sheet_(SHEET_POINT).appendRow([
+        now, phone, name, "적립", WELCOME_POINTS,
+        "", String(p.storeId || ""), String(p.storeName || ""), "신규가입 축하 적립"
+      ]);
+    }
   }
 
-  // 선택: 가입과 동시에 영수증 적립 신청
+  // 영수증 적립은 가입 익일부터 — 가입 요청에 딸려온 영수증은 접수하지 않음
   var receipt = null;
   if (p.receiptNo) {
-    receipt = addReceipt_({
-      phone: phone, name: name, brand: p.brand, storeId: p.storeId,
-      storeName: p.storeName, receiptNo: p.receiptNo, amount: p.receiptAmount,
-      photo: p.photo, photoType: p.photoType, via: "가입폼"
-    });
+    receipt = { ok: false, message: "영수증 적립은 회원가입 익일부터 가능합니다" };
   }
 
   return json_({ result: "ok", status: status, receipt: receipt });
@@ -347,6 +359,7 @@ function handleReceipt_(p) {
   if (!/^01[016789]-\d{3,4}-\d{4}$/.test(phone)) return json_({ result: "error", message: "전화번호 형식 오류" });
   var found = findMember_(phone);
   if (!found[0]) return json_({ result: "error", message: "가입되지 않은 번호입니다. 먼저 멤버십에 가입해주세요." });
+  if (joinedToday_(found[0])) return json_({ result: "error", message: "영수증 적립은 회원가입 익일부터 가능합니다 (가입 당일 적립 불가)" });
 
   var receipt = addReceipt_({
     phone: phone, name: found[1], brand: p.brand, storeId: p.storeId,
@@ -381,6 +394,7 @@ function handleStaffEarn_(p) {
   var phone = String(p.phone || "").trim();
   var found = findMember_(phone);
   if (!found[0]) return json_({ result: "error", message: "가입되지 않은 번호입니다" });
+  if (joinedToday_(found[0])) return json_({ result: "error", message: "영수증 적립은 회원가입 익일부터 가능합니다 (가입 당일 적립 불가)" });
 
   var receipt = addReceipt_({
     phone: phone, name: found[1], brand: p.brand, storeId: p.storeId,

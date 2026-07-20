@@ -139,7 +139,9 @@
 
       <div class="sec-title">마일리지 이용 안내</div>
       <div class="policy-box">
+        <div>· 신규회원 가입 시 <b>3,000P</b> 즉시 적립</div>
         <div>· 구매 영수증 등록 시 <b>결제금액의 1%</b>가 즉시 적립</div>
+        <div>· 영수증 적립은 <b>회원가입 익일부터</b> 가능합니다 (가입 당일 적립 불가)</div>
         <div>· <b>5,000P부터 1,000P 단위</b>로 매장에서 에누리 사용 가능 (1P = 1원)</div>
         <div>· 포인트는 <b>적립일로부터 1년</b> 경과 시 자동 소멸됩니다</div>
       </div>
@@ -349,8 +351,10 @@ async function submitJoin() {
       document.getElementById("doneTitle").textContent = "이미 가입된 회원입니다";
       document.getElementById("doneMsg").innerHTML = "방문 정보가 업데이트되었습니다.<br>멤버십 혜택은 매장 직원에게 문의해주세요.";
     }
-    document.getElementById("doneMsg").innerHTML +=
-      "<br><br>🧾 오늘 구매 영수증이 있다면 매장 직원에게<br>영수증 적립(1%)을 요청해주세요!";
+    if (j.status === "new") {
+      document.getElementById("doneMsg").innerHTML +=
+        "<br><br>🎁 신규가입 <b>3,000P</b>가 적립되었습니다!<br>영수증 적립(1%)은 가입 다음 날부터 가능합니다.";
+    }
     window.scrollTo(0, 0);
   } catch (err) {
     alert("가입 처리 중 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.\n(" + err.message + ")");
