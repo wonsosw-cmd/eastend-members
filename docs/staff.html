@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<title>매장용 회원 조회</title>
+<style>
+  :root { --navy: #1b2a4a; --teal: #2a9d8f; --amber: #e9a13b; --bg: #f2f4f7; --line: #e4e8ee; --muted: #8a93a5; --danger: #d64545; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Pretendard Variable", "Pretendard", -apple-system, "Malgun Gothic", sans-serif; background: var(--bg); color: #22293a; }
+  .wrap { max-width: 460px; margin: 0 auto; min-height: 100vh; background: #fff; }
+  header { background: var(--navy); color: #fff; padding: 18px 20px; display: flex; align-items: center; gap: 10px; }
+  header h1 { font-size: 16px; font-weight: 800; flex: 1; }
+  header .store-badge { font-size: 12px; background: rgba(255,255,255,.15); border-radius: 12px; padding: 4px 10px; cursor: pointer; }
+  .body { padding: 20px 18px 40px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12.5px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: 10px;
+    font-size: 16px; font-family: inherit; -webkit-appearance: none; appearance: none; background: #fff;
+  }
+  .btn { width: 100%; padding: 14px; border: none; border-radius: 10px; font-size: 15.5px; font-weight: 700; font-family: inherit; cursor: pointer; }
+  .btn.primary { background: var(--navy); color: #fff; }
+  .btn:disabled { opacity: .5; }
+  .msg { margin-top: 12px; font-size: 13.5px; font-weight: 600; line-height: 1.6; min-height: 20px; }
+  .msg.ok { color: #2c7a3e; }
+  .msg.err { color: var(--danger); }
+  .note { font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+  /* 조회 결과 */
+  .result { display: none; margin-top: 18px; }
+  .card { border: 1.5px solid var(--line); border-radius: 14px; padding: 20px; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 12px; margin-bottom: 12px; }
+  .badge.city { background: #e8ecf5; color: var(--navy); }
+  .badge.artid { background: #e2f3f1; color: #1d7a70; }
+  .member-name { font-size: 24px; font-weight: 800; }
+  .member-sub { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+  .earn-box { margin-top: 16px; border-radius: 12px; padding: 16px; text-align: center; }
+  .earn-box.yes { background: #e6f5ec; }
+  .earn-box.no { background: #fdf0e4; }
+  .earn-box .head { font-size: 15.5px; font-weight: 800; }
+  .earn-box.yes .head { color: #2c7a3e; }
+  .earn-box.no .head { color: #b0721a; }
+  .earn-box .sub { font-size: 12.5px; color: #5a6376; margin-top: 6px; line-height: 1.6; }
+  /* 미가입 */
+  .nomember { display: none; margin-top: 18px; border: 1.5px dashed var(--line); border-radius: 14px; padding: 24px 20px; text-align: center; background: #fbfcfd; }
+  .nomember .big { font-size: 18px; font-weight: 800; color: var(--danger); }
+  .nomember .sub { font-size: 13.5px; color: #5a6376; margin-top: 10px; line-height: 1.7; }
+  .divider { height: 1px; background: var(--line); margin: 18px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>매장용 회원 조회</h1>
+    <span class="store-badge" id="storeBadge" onclick="changeStore()">매장 선택</span>
+  </header>
+  <div class="body">
+    <!-- 토큰 게이트 -->
+    <div id="gate">
+      <div class="field"><label>매장용 토큰</label><input type="password" id="staffToken" placeholder="매장용 토큰 입력"></div>
+      <div class="field"><label>우리 매장</label><select id="storeSel"></select></div>
+      <button class="btn primary" onclick="saveGate()">시작하기</button>
+      <div class="note">토큰은 관리자에게 문의하세요. 이 기기에 저장됩니다.</div>
+    </div>
+
+    <!-- 조회 -->
+    <div id="main" style="display:none;">
+      <div class="field">
+        <label>고객 휴대전화번호</label>
+        <input type="tel" id="qPhone" placeholder="010-0000-0000" inputmode="numeric" maxlength="13">
+      </div>
+      <button class="btn primary" id="btnLookup" onclick="lookup()">가입 여부 조회</button>
+      <div class="msg" id="lookupMsg"></div>
+
+      <div class="result" id="result">
+        <div class="card">
+          <span class="badge" id="rBadge">-</span>
+          <div class="member-name" id="rName">-</div>
+          <div class="member-sub" id="rSub">-</div>
+          <div class="earn-box" id="rEarn">
+            <div class="head" id="rEarnHead">-</div>
+            <div class="sub" id="rEarnSub">-</div>
+          </div>
+        </div>
+        <div class="note">※ 포인트 잔액·사용(에누리)은 매장 판매 프로그램에서 확인해주세요.</div>
+      </div>
+
+      <div class="nomember" id="nomember">
+        <div class="big">미가입 고객입니다</div>
+        <div class="sub">QR 포스터로 가입을 안내해주세요.<br>가입 시 <b>3,000P</b>가 지급됩니다!</div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="note">
+        ※ 1% 적립 시작 — <b>아티드</b>: 가입 당일부터 / <b>시티브리즈</b>: 가입 다음 날부터<br>
+        ※ 고객 정보는 조회 업무에만 사용하고 화면을 타인에게 보여주지 마세요.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="stores.js"></script>
+<script src="config.js"></script>
+<script>
+const sel = document.getElementById("storeSel");
+window.EE_STORES.forEach(s => {
+  const o = document.createElement("option");
+  o.value = s.id; o.textContent = "[" + s.brandKo + "] " + s.name;
+  sel.appendChild(o);
+});
+
+let TOKEN = localStorage.getItem("ee_staff_token") || "";
+let STORE = window.EE_STORE_BY_ID[localStorage.getItem("ee_staff_store")] || null;
+
+function refreshGate() {
+  const ready = TOKEN && STORE;
+  document.getElementById("gate").style.display = ready ? "none" : "block";
+  document.getElementById("main").style.display = ready ? "block" : "none";
+  document.getElementById("storeBadge").textContent = STORE ? (STORE.brandKo + " " + STORE.name) : "매장 선택";
+}
+function saveGate() {
+  const t = document.getElementById("staffToken").value.trim();
+  if (!t) { alert("토큰을 입력해주세요."); return; }
+  TOKEN = t; STORE = window.EE_STORE_BY_ID[sel.value];
+  localStorage.setItem("ee_staff_token", TOKEN);
+  localStorage.setItem("ee_staff_store", STORE.id);
+  refreshGate();
+}
+function changeStore() {
+  localStorage.removeItem("ee_staff_token");
+  localStorage.removeItem("ee_staff_store");
+  TOKEN = ""; STORE = null;
+  refreshGate();
+}
+refreshGate();
+
+document.getElementById("qPhone").addEventListener("input", e => {
+  let v = e.target.value.replace(/\D/g, "").slice(0, 11);
+  if (v.length > 7) v = v.slice(0,3) + "-" + v.slice(3,7) + "-" + v.slice(7);
+  else if (v.length > 3) v = v.slice(0,3) + "-" + v.slice(3);
+  e.target.value = v;
+});
+document.getElementById("qPhone").addEventListener("keydown", e => {
+  if (e.key === "Enter") lookup();
+});
+
+function setMsg(text, ok) {
+  const el = document.getElementById("lookupMsg");
+  el.textContent = text; el.className = "msg " + (ok ? "ok" : "err");
+}
+function hideAll() {
+  document.getElementById("result").style.display = "none";
+  document.getElementById("nomember").style.display = "none";
+}
+
+async function lookup() {
+  const phone = document.getElementById("qPhone").value.trim();
+  if (!/^01[016789]-\d{3,4}-\d{4}$/.test(phone)) { hideAll(); setMsg("전화번호를 확인해주세요.", false); return; }
+
+  const btn = document.getElementById("btnLookup");
+  btn.disabled = true; hideAll(); setMsg("조회 중...", true);
+  try {
+    const res = await fetch(window.EE_CONFIG.API_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "staff_lookup", staffToken: TOKEN, phone }),
+    });
+    const j = await res.json();
+    if (j.result !== "ok") throw new Error(j.message);
+    setMsg("", true);
+
+    if (!j.exists) {
+      document.getElementById("nomember").style.display = "block";
+      return;
+    }
+
+    const isArtid = (j.brand || "").indexOf("아티드") === 0;
+    const badge = document.getElementById("rBadge");
+    badge.textContent = j.brand + " 회원";
+    badge.className = "badge " + (isArtid ? "artid" : "city");
+    document.getElementById("rName").textContent = j.name + " 고객님";
+    document.getElementById("rSub").textContent = "가입일 " + j.joinedAt + " · " + (j.joinStore || "");
+
+    const box = document.getElementById("rEarn");
+    if (j.earnToday) {
+      box.className = "earn-box yes";
+      document.getElementById("rEarnHead").textContent = "✅ 오늘 구매분 적립 대상입니다";
+      document.getElementById("rEarnSub").textContent = "구매하시면 결제금액의 1%가 자동 적립됩니다.";
+    } else {
+      box.className = "earn-box no";
+      document.getElementById("rEarnHead").textContent = "⏰ 오늘 구매분은 적립되지 않습니다";
+      document.getElementById("rEarnSub").innerHTML =
+        "1% 적립은 <b>" + j.earnStart + "</b> 구매분부터 시작됩니다.<br>(가입 다음 날부터 적립)";
+    }
+    document.getElementById("result").style.display = "block";
+  } catch (e) {
+    setMsg("조회 실패: " + e.message + (e.message === "unauthorized" ? " (토큰 확인)" : ""), false);
+  } finally { btn.disabled = false; }
+}
+</script>
+</body>
+</html>

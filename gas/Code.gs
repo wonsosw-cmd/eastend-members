@@ -287,9 +287,10 @@ function doPost(e) {
     var action = String(p.action || "");
 
     if (action === "join") return handleJoin_(p);
-    // 포인트(적립·조회·차감)는 외부 판매 프로그램에서 처리 — 이 시스템은 가입 접수 전용
-    if (action === "receipt" || action === "staff_earn" || action === "staff_lookup" || action === "staff_redeem") {
-      return json_({ result: "error", message: "포인트 적립·조회·사용은 매장 판매 프로그램에서 처리됩니다" });
+    if (action === "staff_lookup") return handleStaffLookup_(p);
+    // 포인트(적립·차감)는 외부 판매 프로그램에서 처리
+    if (action === "receipt" || action === "staff_earn" || action === "staff_redeem") {
+      return json_({ result: "error", message: "포인트 적립·사용은 매장 판매 프로그램에서 처리됩니다" });
     }
 
     return json_({ result: "error", message: "unknown action" });
@@ -365,21 +366,35 @@ function handleReceipt_(p) {
   return json_({ result: "ok", name: maskName_(found[1]), receipt: receipt });
 }
 
-// 매장: 전화번호 조회
+// 매장: 가입 여부 조회 (포인트 잔액은 판매 프로그램에서 확인)
 function handleStaffLookup_(p) {
   if (p.staffToken !== props_().getProperty("STAFF_TOKEN")) return json_({ result: "error", message: "unauthorized" });
   var phone = String(p.phone || "").trim();
+  if (!/^01[016789]-\d{3,4}-\d{4}$/.test(phone)) return json_({ result: "error", message: "전화번호 형식 오류" });
   var found = findMember_(phone);
   if (!found[0]) return json_({ result: "ok", exists: false });
 
   var sh = sheet_(SHEET_MEMBER);
+  var brand = String(sh.getRange(found[0], 2).getValue());
+  var joined = sh.getRange(found[0], 1).getValue();
+  var fmt = function (d) { return Utilities.formatDate(d, "Asia/Seoul", "yyyy-MM-dd"); };
+  var joinedStr = (joined instanceof Date) ? fmt(joined) : "";
+
+  // 적립 시작일: 아티드=가입 당일, 시티브리즈=가입 익일
+  var isArtid = brand.indexOf("아티드") === 0;
+  var earnStart = joinedStr;
+  if (!isArtid && joined instanceof Date) {
+    earnStart = fmt(new Date(joined.getTime() + 86400000));
+  }
+
   return json_({
     result: "ok", exists: true,
     name: maskName_(found[1]),
-    balance: getBalance_(phone),
-    pending: getPending_(phone),
-    joinedAt: toIso_(sh.getRange(found[0], 1).getValue()).slice(0, 10),
-    visitCount: sh.getRange(found[0], 13).getValue()
+    brand: brand,
+    joinStore: String(sh.getRange(found[0], 4).getValue()),
+    joinedAt: joinedStr,
+    earnStart: earnStart,
+    earnToday: earnStart <= fmt(new Date())
   });
 }
 
