@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """EASTEND 오프라인 멤버십 — 매장 운영 가이드 PPT (v2.4: 웰컴 3,000P + 익일 적립)"""
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -118,10 +118,10 @@ text(s, 0.9, 2.05, 11.5, 1.9,
      [[("EASTEND 오프라인 멤버십", {})], [("매장 운영 가이드", {})]],
      size=44, color=WHITE, bold=True, line_spacing=1.1)
 text(s, 0.9, 4.15, 11.0, 0.9,
-     [["QR 가입  ·  영수증 적립  ·  마일리지 에누리"],
+     [["QR 가입  ·  구매 시 자동 적립  ·  마일리지 에누리"],
       [("전 매장 공통 절차 안내  |  2026. 07", {"color": RGBColor(0xAF, 0xB9, 0xCE), "size": 14})]],
      size=17, color=WHITE)
-stats = [("신규가입 혜택", "3,000P 즉시 지급"), ("적립률", "구매액의 1% 자동"), ("사용 (1P=1원)", "5,000P부터 1,000P 단위")]
+stats = [("신규가입 혜택", "3,000P 지급"), ("적립률", "구매액의 1% 자동"), ("사용 (1P=1원)", "5,000P부터 1,000P 단위")]
 for i, (k, v) in enumerate(stats):
     x = 0.9 + i * 4.0
     box(s, x, 5.45, 3.6, 1.25, fill=RGBColor(0x25, 0x36, 0x5C))
@@ -131,12 +131,12 @@ for i, (k, v) in enumerate(stats):
 # ───────────────────────── 2. 한눈에 보기
 s = slide()
 title_bar(s, "OVERVIEW", "멤버십, 이렇게 돌아갑니다",
-          "고객은 QR로 가입하고, 구매하면 자동으로 적립되고, 매장에서 포인트만큼 에누리 받습니다.")
+          "매장은 QR 가입만 안내하면 됩니다. 회원 등록·적립·사용은 본사와 판매 프로그램이 처리합니다.")
 flow = [
-    ("1", "QR 스캔 → 가입", "매장 QR 포스터를 스캔해\n정보 입력·동의하면 가입 완료\n신규가입 3,000P 즉시 지급", TEAL),
-    ("2", "구매 시 자동 적립", "구매하면 결제금액의 1%가\n자동으로 적립\n(회원가입 익일부터)", AMBER),
-    ("3", "1년간 사용 가능", "포인트는 적립일로부터\n1년간 유효하며\n미사용분은 자동 소멸", NAVY),
-    ("4", "매장에서 에누리", "결제 시 전화번호 조회 후\n보유 포인트만큼 차감\n(1P = 1원)", TEAL),
+    ("1", "QR 스캔 → 가입", "매장 QR 포스터를 스캔해\n정보 입력·동의하면 가입 완료\n(매장이 할 일은 안내뿐!)", TEAL),
+    ("2", "본사가 회원 등록", "가입 명단을 본사에서 받아\n판매 프로그램에 등록\n+ 웰컴 3,000P 지급", AMBER),
+    ("3", "구매 시 자동 적립", "구매하면 결제금액의 1%가\n프로그램에서 자동 적립\n(회원가입 익일부터)", NAVY),
+    ("4", "포인트로 에누리", "판매 프로그램에서 조회 후\n5,000P부터 1,000P 단위 차감\n(1P = 1원)", TEAL),
 ]
 for i, (n, t, d, c) in enumerate(flow):
     x = 0.65 + i * 3.13
@@ -148,8 +148,8 @@ for i, (n, t, d, c) in enumerate(flow):
         text(s, x + 2.83, 3.35, 0.35, 0.5, "→", size=20, color=MUTED, bold=True, align=PP_ALIGN.CENTER)
 box(s, 0.65, 5.65, 12.05, 1.15, fill=NAVY_T)
 text(s, 1.0, 5.92, 11.4, 0.7,
-     [[("매장에서 하는 일은 딱 2가지  —  ", {"bold": True, "color": NAVY}),
-       ("① QR 가입 안내   ② 포인트 차감(에누리)  — 적립은 자동!", {"color": TEXT})]],
+     [[("매장에서 하는 일은 단 하나  —  ", {"bold": True, "color": NAVY}),
+       ("QR 가입 안내!   (적립·조회·에누리는 판매 프로그램에서 처리)", {"color": TEXT})]],
      size=15)
 
 # ───────────────────────── 3. STEP 1 고객 가입
@@ -160,7 +160,7 @@ steps = [
     ("QR 스캔", "계산대·피팅룸 옆에 비치된 매장 전용 QR을 고객 휴대폰 카메라로 스캔"),
     ("정보 입력", "이름·휴대전화번호·생년월일(필수), 성별(선택) 입력"),
     ("약관 동의", "필수/선택 항목을 구분해 동의 — ‘전체 동의’는 편의 기능(개별 해제 가능)"),
-    ("가입 완료", "신규가입 3,000P 즉시 지급 — 구매 적립(1%)은 가입 다음 날부터 자동"),
+    ("가입 완료", "신규가입 3,000P는 회원 등록 후 지급 — 구매 적립(1%)은 가입 다음 날부터"),
 ]
 for i, (t, d) in enumerate(steps):
     y = 2.0 + i * 1.15
@@ -190,10 +190,10 @@ title_bar(s, "STEP 2", "적립은 자동입니다 — 매장이 할 일 없음",
 box(s, 0.65, 1.95, 5.95, 3.0, fill=WHITE, line=LINE)
 text(s, 1.0, 2.2, 5.2, 0.4, "🎁 신규가입 웰컴", size=16, color=TEAL, bold=True)
 text(s, 1.0, 2.72, 5.3, 2.0,
-     [["QR 가입이 완료되는 순간"],
-      [("3,000P가 즉시 자동 지급", {"bold": True, "color": NAVY})], [""],
+     [["QR 가입 명단을 본사가 프로그램에 등록하면"],
+      [("웰컴 3,000P 지급", {"bold": True, "color": NAVY})], [""],
       ["매장은 가입 안내만 하면 되고,"],
-      ["지급은 시스템이 자동 처리합니다."]],
+      ["등록·지급은 본사가 처리합니다."]],
      size=13, color=TEXT, line_spacing=1.3)
 box(s, 6.75, 1.95, 5.95, 3.0, fill=WHITE, line=LINE)
 text(s, 7.1, 2.2, 5.2, 0.4, "🛍 구매 적립", size=16, color=AMBER, bold=True)
@@ -213,71 +213,6 @@ text(s, 1.0, 5.78, 11.5, 1.1,
        ("  경과 시 자동 소멸  ·  반품 시 적립 취소는 본사에서 처리", {})]],
      size=13, color=TEXT, line_spacing=1.3)
 
-# ───────────────────────── 5. STEP 3 매장용 페이지 설정
-s = slide()
-title_bar(s, "STEP 3", "매장용 페이지 최초 설정 (1회)",
-          "매장 태블릿·공용폰 크롬에서 한 번만 설정하면 이후 자동 로그인됩니다.")
-box(s, 0.65, 1.95, 7.55, 4.4, fill=WHITE, line=LINE)
-setup = [
-    ("접속", "크롬에서 아래 주소 입력 (즐겨찾기/홈화면 추가 권장)"),
-    ("매장용 토큰 입력", "아래 토큰을 정확히 입력"),
-    ("우리 매장 선택", "브랜드·매장명 목록에서 우리 매장 선택"),
-    ("시작하기", "이 기기에 저장됨 — 다음부터 바로 조회 화면"),
-]
-for i, (t, d) in enumerate(setup):
-    y = 2.25 + i * 1.0
-    num_badge(s, 1.0, y + 0.04, i + 1, color=NAVY)
-    text(s, 1.65, y, 6.3, 0.35, t, size=15.5, color=NAVY, bold=True)
-    text(s, 1.65, y + 0.37, 6.4, 0.55, d, size=12.5, color=MUTED)
-box(s, 8.6, 1.95, 4.1, 4.4, fill=NAVY)
-text(s, 8.95, 2.3, 3.4, 0.35, "매장용 페이지 주소", size=12.5, color=RGBColor(0xAF, 0xB9, 0xCE), bold=True)
-text(s, 8.95, 2.68, 3.5, 0.9, "wonsosw-cmd.github.io\n/eastend-members/staff.html",
-     size=14.5, color=WHITE, bold=True, line_spacing=1.2)
-text(s, 8.95, 3.85, 3.4, 0.35, "매장용 토큰", size=12.5, color=RGBColor(0xAF, 0xB9, 0xCE), bold=True)
-box(s, 8.95, 4.22, 3.4, 0.62, fill=RGBColor(0x25, 0x36, 0x5C))
-text(s, 8.95, 4.32, 3.4, 0.45, "eastlove", size=18, color=AMBER, bold=True, align=PP_ALIGN.CENTER)
-text(s, 8.95, 5.05, 3.45, 1.1,
-     [["토큰은 매장 내부용입니다."], ["고객·외부에 노출되지 않도록"], ["주의해주세요."]],
-     size=11.5, color=RGBColor(0xAF, 0xB9, 0xCE), line_spacing=1.3)
-box(s, 0.65, 6.55, 12.05, 0.6, fill=AMBER_T)
-text(s, 1.0, 6.68, 11.4, 0.4,
-     [[("TIP  ", {"bold": True, "color": AMBER}),
-       ("크롬 메뉴 → ‘홈 화면에 추가’를 해두면 앱처럼 바로 열 수 있습니다.", {"color": TEXT})]], size=12.5)
-
-# ───────────────────────── 6. STEP 4 조회·적립·차감
-s = slide()
-title_bar(s, "STEP 4", "일상 운영 — 조회 · 차감",
-          "모든 작업은 ‘전화번호 조회 → 고객 확인’ 후에 진행합니다. 적립은 자동입니다.")
-box(s, 0.65, 1.95, 5.95, 4.4, fill=WHITE, line=LINE)
-text(s, 1.0, 2.2, 5.2, 0.4, "① 조회 & 본인 확인", size=15.5, color=NAVY, bold=True)
-text(s, 1.0, 2.72, 5.3, 3.4,
-     [["고객 전화번호 입력 → 조회"],
-      [""],
-      ["화면에 이름이 홍*동 처럼 일부만 표시됩니다."],
-      [""],
-      [("“홍길동 고객님 맞으세요?”", {"bold": True, "color": NAVY})],
-      ["확인 후 진행해주세요."],
-      [""],
-      [("잔액(사용 가능 마일리지)이 함께 표시됩니다.", {"color": MUTED, "size": 11.5})]],
-     size=12.5, color=TEXT, line_spacing=1.3)
-box(s, 6.75, 1.95, 5.95, 4.4, fill=AMBER_T)
-text(s, 7.1, 2.2, 5.2, 0.4, "② 마일리지 차감 (에누리)", size=15.5, color=RGBColor(0xB0, 0x72, 0x1A), bold=True)
-text(s, 7.1, 2.72, 5.3, 3.4,
-     [["‘마일리지 차감’에서 차감할 포인트 입력 (1P = 1원)"],
-      [""],
-      [("→ 5,000P부터, 1,000P 단위", {"bold": True, "color": NAVY})],
-      [("→ 결제 금액에서 에누리 적용", {"bold": True, "color": NAVY})],
-      [""],
-      [("잔액 초과·규칙 위반 시 차감되지 않고", {"color": MUTED, "size": 11.5})],
-      [("안내 문구가 표시됩니다.", {"color": MUTED, "size": 11.5})],
-      [""],
-      [("적립은 자동이므로 매장 입력이 없습니다.", {"color": MUTED, "size": 11.5})]],
-     size=12.5, color=TEXT, line_spacing=1.3)
-box(s, 0.65, 6.55, 12.05, 0.6, fill=NAVY_T)
-text(s, 1.0, 6.68, 11.4, 0.4,
-     [[("주의  ", {"bold": True, "color": RED}),
-       ("차감은 되돌리기 어렵습니다. 금액을 고객과 함께 확인한 뒤 진행해주세요.", {"color": TEXT})]], size=12.5)
-
 # ───────────────────────── 7. FAQ
 s = slide()
 title_bar(s, "FAQ", "자주 묻는 질문 & 꼭 지켜주세요")
@@ -296,7 +231,7 @@ for i, (q, a) in enumerate(faqs):
 box(s, 0.65, 5.05, 12.05, 1.75, fill=RGBColor(0xFB, 0xEC, 0xEC))
 text(s, 1.0, 5.28, 11.5, 0.35, "개인정보 — 반드시 지켜주세요", size=14.5, color=RED, bold=True)
 text(s, 1.0, 5.7, 11.5, 1.0,
-     [["·  매장용 페이지 토큰과 고객 정보(전화번호·이름)는 외부에 공유 금지"],
+     [["·  고객 정보(전화번호·이름 등)는 외부에 공유 금지"],
       ["·  고객 정보는 적립·차감 업무에만 사용하고, 화면을 고객 외 타인에게 보여주지 않기"],
       ["·  고객이 탈퇴·동의 철회를 요청하면 본사(영업마케팅실)로 즉시 전달"]],
      size=13, color=TEXT, line_spacing=1.35)
@@ -304,10 +239,10 @@ text(s, 1.0, 5.7, 11.5, 1.0,
 # ───────────────────────── 8. 마무리
 s = slide(NAVY)
 text(s, 0.9, 2.1, 11.5, 0.9, "오늘부터 시작하세요!", size=38, color=WHITE, bold=True)
-text(s, 0.9, 3.05, 11.5, 0.5, "QR 포스터 비치 → 매장용 페이지 설정 → 첫 고객 가입 안내", size=16, color=RGBColor(0xAF, 0xB9, 0xCE))
+text(s, 0.9, 3.05, 11.5, 0.5, "QR 포스터 비치 → 첫 고객 가입 안내 — 이게 전부입니다!", size=16, color=RGBColor(0xAF, 0xB9, 0xCE))
 links = [
-    ("매장용 페이지", "wonsosw-cmd.github.io/eastend-members/staff.html"),
     ("QR 포스터 (인쇄)", "wonsosw-cmd.github.io/eastend-members/qr.html"),
+    ("포인트 조회·사용", "매장 판매 프로그램에서 처리"),
     ("문의", "영업마케팅실  ·  wonsosw@eastend.co.kr"),
 ]
 for i, (k, v) in enumerate(links):

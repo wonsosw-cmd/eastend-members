@@ -1,6 +1,7 @@
 /**
  * EASTEND 오프라인 멤버십 v2 — Apps Script 백엔드
- * 회원가입(웰컴 3,000P) + 마일리지 조회/차감 — 구매 적립(1%)은 외부 판매 프로그램에서 처리
+ * QR 가입 접수 전용 — 회원 명단을 본사가 CSV로 받아 판매 프로그램에 등록
+ * 포인트(웰컴 3,000P·구매 적립 1%·사용)는 전부 판매 프로그램에서 관리
  *
  * 시트: 회원 / 영수증 / 포인트   (개인정보 포함 — 링크 공유 금지)
  * 코드 업데이트 후: setup2 1회 실행 → 배포 > 배포 관리 > 수정 > 새 버전
@@ -286,11 +287,9 @@ function doPost(e) {
     var action = String(p.action || "");
 
     if (action === "join") return handleJoin_(p);
-    if (action === "staff_lookup") return handleStaffLookup_(p);
-    if (action === "staff_redeem") return handleStaffRedeem_(p);
-    // 영수증 적립은 폐지 — 구매 적립(1%)은 판매 프로그램에서 자동 처리
-    if (action === "receipt" || action === "staff_earn") {
-      return json_({ result: "error", message: "구매 적립(1%)은 판매 프로그램에서 자동 처리됩니다" });
+    // 포인트(적립·조회·차감)는 외부 판매 프로그램에서 처리 — 이 시스템은 가입 접수 전용
+    if (action === "receipt" || action === "staff_earn" || action === "staff_lookup" || action === "staff_redeem") {
+      return json_({ result: "error", message: "포인트 적립·조회·사용은 매장 판매 프로그램에서 처리됩니다" });
     }
 
     return json_({ result: "error", message: "unknown action" });
@@ -337,13 +336,7 @@ function handleJoin_(p) {
     var r = sh.getLastRow();
     sh.getRange(r, 6, 1, 2).setNumberFormat("@");
     status = "new";
-    // 신규가입 축하 포인트 즉시 지급
-    if (WELCOME_POINTS > 0) {
-      sheet_(SHEET_POINT).appendRow([
-        now, phone, name, "적립", WELCOME_POINTS,
-        "", String(p.storeId || ""), String(p.storeName || ""), "신규가입 축하 적립"
-      ]);
-    }
+    // 포인트(웰컴 3,000P 포함)는 외부 판매 프로그램에서 지급·관리
   }
 
   // 영수증 적립은 가입 익일부터 — 가입 요청에 딸려온 영수증은 접수하지 않음
@@ -446,16 +439,14 @@ function doGet(e) {
     var last = sh.getLastRow();
     var rows = [];
     if (last >= 2) {
-      var bmap = balanceMap_();
-      var vals = sh.getRange(2, 1, last - 1, 13).getValues();
+      var vals = sh.getRange(2, 1, last - 1, 15).getValues();
       rows = vals.map(function (v) {
-        var ph = String(v[5]);
         return {
           joinedAt: toIso_(v[0]), brand: v[1], storeId: v[2], storeName: v[3],
-          name: v[4], phone: ph, birth: String(v[6]), gender: v[7],
+          name: v[4], phone: String(v[5]), birth: String(v[6]), gender: v[7],
           consentPrivacy: v[8], consentMarketing: v[9],
           lastVisit: toIso_(v[11]), visitCount: v[12],
-          balance: bmap[ph] || 0
+          consentNight: v[14] || "N"
         };
       });
     }
