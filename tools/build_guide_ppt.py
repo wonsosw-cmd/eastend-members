@@ -20,7 +20,7 @@ AMBER_T = RGBColor(0xFC, 0xF0, 0xDE)
 NAVY_T = RGBColor(0xE8, 0xEC, 0xF5)
 RED = RGBColor(0xD6, 0x45, 0x45)
 
-FONT = "맑은 고딕"
+FONT = "Pretendard"
 QR_SAMPLE = r"G:\공유 드라이브\영업마케팅실\★. 데일리 매출 보고\★오프라인 회원관리\QR_포스터용_PNG\C005_시티브리즈_플래그십.png"
 OUT = r"G:\공유 드라이브\영업마케팅실\★. 데일리 매출 보고\★오프라인 회원관리\EASTEND_멤버십_매장가이드_v1.pptx"
 
