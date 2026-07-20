@@ -141,7 +141,7 @@
       <div class="policy-box">
         <div>· 신규회원 가입 시 <b>3,000P</b> 적립</div>
         <div>· 구매 시 <b>결제금액의 1%</b>가 자동 적립됩니다</div>
-        <div>· 적립은 <b>회원가입 익일부터</b> 가능합니다 (가입 당일 적립 불가)</div>
+        <div id="earnStartNote">· 적립 시작 시점은 브랜드별로 상이합니다</div>
         <div>· <b>5,000P부터 1,000P 단위</b>로 매장에서 에누리 사용 가능 (1P = 1원)</div>
         <div>· 포인트는 <b>적립일로부터 1년</b> 경과 시 자동 소멸됩니다</div>
       </div>
@@ -242,6 +242,10 @@ function applyBrand() {
   document.title = store.brandKo + " 멤버십 가입";
   // 브랜드 컬러: 시티브리즈=네이비, 아티드=틸
   document.documentElement.style.setProperty("--brand", store.brand === "ARTID" ? "#2a9d8f" : "#1b2a4a");
+  // 적립 시작 시점: 아티드=가입 당일부터, 시티브리즈=가입 익일부터
+  document.getElementById("earnStartNote").innerHTML = store.brand === "ARTID"
+    ? "· 적립은 <b>가입 당일 구매분부터</b> 바로 가능합니다"
+    : "· 적립은 <b>회원가입 익일부터</b> 가능합니다 (가입 당일 적립 불가)";
 }
 
 // store 파라미터가 없거나 잘못된 경우 → 매장 선택 드롭다운 표시
@@ -352,8 +356,11 @@ async function submitJoin() {
       document.getElementById("doneMsg").innerHTML = "방문 정보가 업데이트되었습니다.<br>멤버십 혜택은 매장 직원에게 문의해주세요.";
     }
     if (j.status === "new") {
+      const earnLine = store.brand === "ARTID"
+        ? "구매 적립(1%)은 오늘 구매분부터 바로 적용됩니다."
+        : "구매 적립(1%)은 가입 다음 날부터 자동 적용됩니다.";
       document.getElementById("doneMsg").innerHTML +=
-        "<br><br>🎁 신규가입 <b>3,000P</b>는 멤버십 등록 완료 후 지급됩니다.<br>구매 적립(1%)은 가입 다음 날부터 자동 적용됩니다.";
+        "<br><br>🎁 신규가입 <b>3,000P</b>는 멤버십 등록 완료 후 지급됩니다.<br>" + earnLine;
     }
     window.scrollTo(0, 0);
   } catch (err) {
