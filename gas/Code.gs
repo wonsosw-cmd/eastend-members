@@ -1,6 +1,6 @@
 /**
  * EASTEND 오프라인 멤버십 v2 — Apps Script 백엔드
- * 회원가입 + 영수증 적립(1%, 등록 즉시) + 매장 적립/차감
+ * 회원가입(웰컴 3,000P) + 마일리지 조회/차감 — 구매 적립(1%)은 외부 판매 프로그램에서 처리
  *
  * 시트: 회원 / 영수증 / 포인트   (개인정보 포함 — 링크 공유 금지)
  * 코드 업데이트 후: setup2 1회 실행 → 배포 > 배포 관리 > 수정 > 새 버전
@@ -286,10 +286,12 @@ function doPost(e) {
     var action = String(p.action || "");
 
     if (action === "join") return handleJoin_(p);
-    if (action === "receipt") return handleReceipt_(p);
     if (action === "staff_lookup") return handleStaffLookup_(p);
-    if (action === "staff_earn") return handleStaffEarn_(p);
     if (action === "staff_redeem") return handleStaffRedeem_(p);
+    // 영수증 적립은 폐지 — 구매 적립(1%)은 판매 프로그램에서 자동 처리
+    if (action === "receipt" || action === "staff_earn") {
+      return json_({ result: "error", message: "구매 적립(1%)은 판매 프로그램에서 자동 처리됩니다" });
+    }
 
     return json_({ result: "error", message: "unknown action" });
   } catch (err) {

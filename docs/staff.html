@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -80,21 +80,13 @@
 
       <div id="actionArea">
         <div class="tabs">
-          <button id="tabEarn" class="on" onclick="showTab('earn')">🧾 영수증 적립</button>
-          <button id="tabUse" onclick="showTab('use')">💸 마일리지 차감</button>
+          <button id="tabUse" class="on">💸 마일리지 차감 (에누리)</button>
         </div>
-        <div class="panel on" id="panelEarn">
-          <div class="field"><label>영수증 번호</label><input type="text" id="eNo" maxlength="30" placeholder="영수증 하단의 번호"></div>
-          <div class="field"><label>결제 금액</label><input type="tel" id="eAmt" inputmode="numeric" maxlength="11" placeholder="예: 59,000"></div>
-          <button class="btn teal" id="btnEarn" onclick="earn()">적립 등록 (1% 즉시 적립)</button>
-          <div class="msg" id="earnMsg"></div>
-          <div class="note">※ 영수증 적립은 회원가입 익일부터 가능 (신규가입 3,000P는 가입 즉시 자동 지급)</div>
-        </div>
-        <div class="panel" id="panelUse">
+        <div class="panel on" id="panelUse">
           <div class="field"><label>차감할 포인트 (1P = 1원 에누리)</label><input type="tel" id="uAmt" inputmode="numeric" maxlength="9" placeholder="예: 5,000"></div>
           <button class="btn amber" id="btnUse" onclick="redeem()">차감 (에누리 적용)</button>
           <div class="msg" id="useMsg"></div>
-          <div class="note">※ 5,000P부터 1,000P 단위로 사용 가능 · 포인트는 적립일로부터 1년 경과 시 자동 소멸</div>
+          <div class="note">※ 5,000P부터 1,000P 단위로 사용 가능 · 포인트는 적립일로부터 1년 경과 시 자동 소멸<br>※ 구매 적립(1%)은 판매 프로그램에서 자동 처리 (회원가입 익일부터) · 신규가입 3,000P는 가입 즉시 지급</div>
         </div>
       </div>
     </div>
@@ -144,10 +136,10 @@ document.getElementById("qPhone").addEventListener("input", e => {
   else if (v.length > 3) v = v.slice(0,3) + "-" + v.slice(3);
   e.target.value = v;
 });
-["eAmt","uAmt"].forEach(id => document.getElementById(id).addEventListener("input", e => {
+document.getElementById("uAmt").addEventListener("input", e => {
   const v = e.target.value.replace(/\D/g, "").slice(0, 8);
   e.target.value = v ? Number(v).toLocaleString() : "";
-}));
+});
 
 async function api(payload) {
   payload.staffToken = TOKEN;
@@ -187,29 +179,6 @@ async function lookup() {
   } catch (e) {
     setMsg("lookupMsg", "조회 실패: " + e.message + (e.message === "unauthorized" ? " (토큰 확인)" : ""), false);
   } finally { btn.disabled = false; }
-}
-
-function showTab(t) {
-  document.getElementById("tabEarn").className = t === "earn" ? "on" : "";
-  document.getElementById("tabUse").className = t === "use" ? "on" : "";
-  document.getElementById("panelEarn").className = "panel" + (t === "earn" ? " on" : "");
-  document.getElementById("panelUse").className = "panel" + (t === "use" ? " on" : "");
-}
-
-async function earn() {
-  const no = document.getElementById("eNo").value.trim();
-  const amt = document.getElementById("eAmt").value.replace(/\D/g, "");
-  if (!no || !amt) { setMsg("earnMsg", "영수증 번호와 금액을 입력해주세요.", false); return; }
-  if (!confirm("영수증 " + no + " / " + Number(amt).toLocaleString() + "원 적립 등록할까요?")) return;
-  const btn = document.getElementById("btnEarn"); btn.disabled = true;
-  try {
-    const j = await api({ action: "staff_earn", phone: CUR_PHONE, receiptNo: no, amount: amt });
-    if (j.result !== "ok") throw new Error(j.message);
-    document.getElementById("mBal").textContent = Number(j.balance).toLocaleString() + "P";
-    setMsg("earnMsg", j.receipt.points.toLocaleString() + "P 즉시 적립 완료! 잔액 " + Number(j.balance).toLocaleString() + "P", true);
-    document.getElementById("eNo").value = ""; document.getElementById("eAmt").value = "";
-  } catch (e) { setMsg("earnMsg", "실패: " + e.message, false); }
-  finally { btn.disabled = false; }
 }
 
 async function redeem() {
