@@ -213,6 +213,34 @@ text(s, 1.0, 5.78, 11.5, 1.1,
        ("  경과 시 자동 소멸  ·  반품 시 적립 취소는 본사에서 처리", {})]],
      size=13, color=TEXT, line_spacing=1.3)
 
+# ───────────────────────── 5. STEP 3 판매 프로그램 (조회·사용)
+s = slide()
+title_bar(s, "STEP 3", "회원 조회 · 마일리지 사용 — 판매 프로그램에서",
+          "고객 응대 시 회원 조회와 포인트 사용은 매장 판매 프로그램에서 진행합니다.")
+box(s, 0.65, 1.95, 5.95, 3.5, fill=WHITE, line=LINE)
+text(s, 1.0, 2.2, 5.2, 0.4, "🔍 회원 조회", size=16, color=NAVY, bold=True)
+text(s, 1.0, 2.75, 5.3, 2.5,
+     [["결제 전 고객 휴대전화번호로 조회해"],
+      [("회원 여부와 보유 포인트를 확인", {"bold": True, "color": NAVY})],
+      [""],
+      [("· 미가입 고객이면 → QR 가입 먼저 안내", {})],
+      [("· 조회된 성함을 고객과 확인 후 진행", {})]],
+     size=13, color=TEXT, line_spacing=1.35)
+box(s, 6.75, 1.95, 5.95, 3.5, fill=AMBER_T)
+text(s, 7.1, 2.2, 5.2, 0.4, "💸 마일리지 사용 (에누리)", size=16, color=RGBColor(0xB0, 0x72, 0x1A), bold=True)
+text(s, 7.1, 2.75, 5.3, 2.5,
+     [["보유 포인트만큼 결제금액에서 차감"],
+      [""],
+      [("· 5,000P부터 사용 가능", {"bold": True, "color": NAVY})],
+      [("· 1,000P 단위로만 사용", {"bold": True, "color": NAVY})],
+      [("· 1P = 1원", {"bold": True, "color": NAVY})]],
+     size=13, color=TEXT, line_spacing=1.35)
+box(s, 0.65, 5.7, 12.05, 1.15, fill=NAVY_T)
+text(s, 1.0, 5.95, 11.4, 0.7,
+     [[("정리  —  ", {"bold": True, "color": NAVY}),
+       ("가입 안내는 QR 포스터로,  조회·사용은 판매 프로그램으로!  (적립은 자동이라 할 일 없음)", {"color": TEXT})]],
+     size=14.5)
+
 # ───────────────────────── 7. FAQ
 s = slide()
 title_bar(s, "FAQ", "자주 묻는 질문 & 꼭 지켜주세요")
