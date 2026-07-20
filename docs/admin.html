@@ -61,7 +61,8 @@
   <header>
     <h1>EASTEND 오프라인 멤버십 관리</h1>
     <div class="sp"></div>
-    <button class="primary" onclick="downloadCsv()">CSV 다운로드</button>
+    <button class="primary" onclick="downloadRegCsv()">📋 회원등록용 CSV</button>
+    <button onclick="downloadCsv()">전체 CSV</button>
     <button onclick="loadData()">새로고침</button>
     <button onclick="logout()">로그아웃</button>
   </header>
@@ -199,6 +200,79 @@ function renderTable() {
     <td>${String(r.lastVisit||"").slice(0,10)}</td>
     <td>${r.visitCount||1}</td>
   </tr>`).join("");
+}
+
+// ── 회원등록용 CSV (DD고객엑셀파일양식) ─────────────────────
+// 필수(파란색): 성명·성별·이동전화번호·생년월일·가입매장·가입일자
+const REG_HEADER = ["성명","성별","이동전화번호","생일구분","생년월일","고객등급","고객상태","가입매장","가입일자",
+  "SMS수신","이메일수신","이메일","카드번호","발급일자","DM발송지","배우자성명","배우자생일구분","배우자생년월일",
+  "결혼일자","자택전화","자택우편번호","자택주소1","자택주소2","직업","직장명","직장전화번호","직장우편번호",
+  "직장주소1","직장주소2","비고"];
+
+// YYMMDD(6자리) → YYYYMMDD(8자리). 두 자리 연도가 올해보다 크면 19xx, 아니면 20xx
+function toBirth8(v) {
+  const s = String(v || "").replace(/\D/g, "");
+  if (s.length === 8) return s;
+  if (s.length !== 6) return "";
+  const yy = Number(s.slice(0, 2));
+  const nowYY = new Date().getFullYear() % 100;
+  return (yy > nowYY ? "19" : "20") + s;
+}
+
+// 성별: 여성 0 / 남성 1 / 미선택 0
+function toGenderCode(g) {
+  return String(g || "").trim() === "남성" ? "1" : "0";
+}
+
+// 매장코드(재무) → ERP 매장코드(M0001 형식)
+function toErpStore(storeId, storeName) {
+  const s = window.EE_STORE_BY_ID[storeId];
+  if (s && s.erp) return s.erp;
+  const byName = window.EE_STORES.find(x => x.name === storeName);
+  return (byName && byName.erp) || "";
+}
+
+function downloadRegCsv() {
+  const skipped = [];
+  const lines = [REG_HEADER.join(",")];
+
+  ROWS.forEach(r => {
+    const birth = toBirth8(r.birth);
+    const store = toErpStore(r.storeId, r.storeName);
+    const joined = String(r.joinedAt || "").slice(0, 10);
+    // 필수 누락 시 제외하고 사유 안내
+    const miss = [];
+    if (!r.name) miss.push("성명");
+    if (!r.phone) miss.push("전화번호");
+    if (!birth) miss.push("생년월일");
+    if (!store) miss.push("가입매장코드");
+    if (!joined) miss.push("가입일자");
+    if (miss.length) { skipped.push(`${r.name || "(이름없음)"} / ${r.phone || "-"} — ${miss.join("·")} 없음`); return; }
+
+    const row = new Array(REG_HEADER.length).fill("");
+    row[0] = r.name;              // 성명
+    row[1] = toGenderCode(r.gender); // 성별 (여0/남1)
+    row[2] = r.phone;             // 이동전화번호
+    row[4] = birth;               // 생년월일 YYYYMMDD
+    row[7] = store;               // 가입매장 (ERP코드)
+    row[8] = joined;              // 가입일자 YYYY-MM-DD
+    lines.push(row.map(v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`).join(","));
+  });
+
+  if (lines.length === 1) { alert("등록 가능한 회원이 없습니다."); return; }
+
+  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `DD회원등록_${todayStr().replace(/-/g, "")}.csv`;
+  a.click();
+
+  let msg = `회원등록용 CSV ${lines.length - 1}명 다운로드 완료`;
+  if (skipped.length) {
+    msg += `\n\n⚠ 필수항목 누락으로 제외된 ${skipped.length}명:\n` + skipped.join("\n")
+        + `\n\n→ 시트에서 해당 정보를 채운 뒤 다시 받아주세요.`;
+  }
+  alert(msg);
 }
 
 function downloadCsv() {
