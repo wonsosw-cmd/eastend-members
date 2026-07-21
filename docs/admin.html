@@ -250,12 +250,14 @@ function downloadRegCsv() {
     if (miss.length) { skipped.push(`${r.name || "(이름없음)"} / ${r.phone || "-"} — ${miss.join("·")} 없음`); return; }
 
     const row = new Array(REG_HEADER.length).fill("");
-    row[0] = r.name;              // 성명
-    row[1] = toGenderCode(r.gender); // 성별 (여0/남1)
-    row[2] = r.phone;             // 이동전화번호
-    row[4] = birth;               // 생년월일 YYYYMMDD
-    row[7] = store;               // 가입매장 (ERP코드)
-    row[8] = joined;              // 가입일자 YYYY-MM-DD
+    row[0] = r.name;                              // 성명 (필수)
+    row[1] = toGenderCode(r.gender);              // 성별 (필수) 여0/남1/미선택0
+    row[2] = r.phone;                             // 이동전화번호 (필수)
+    row[4] = birth;                               // 생년월일 (필수) YYYYMMDD
+    row[7] = store;                               // 가입매장 (필수) ERP코드
+    row[8] = joined;                              // 가입일자 (필수) YYYY-MM-DD
+    row[9] = r.consentMarketing === "Y" ? "1" : "0"; // SMS수신 ← 마케팅 수신 동의
+    row[29] = `${r.brand || ""} QR가입${r.consentNight === "Y" ? " / 야간수신동의" : ""}`; // 비고
     lines.push(row.map(v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`).join(","));
   });
 
