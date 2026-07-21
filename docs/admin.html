@@ -256,7 +256,7 @@ function downloadRegCsv() {
     row[4] = birth;                               // 생년월일 (필수) YYYYMMDD
     row[7] = store;                               // 가입매장 (필수) ERP코드
     row[8] = joined;                              // 가입일자 (필수) YYYY-MM-DD
-    row[9] = r.consentMarketing === "Y" ? "1" : "0"; // SMS수신 ← 마케팅 수신 동의
+    row[9] = r.consentMarketing === "Y" ? "Y" : "N"; // SMS수신 ← 마케팅 수신 동의
     row[29] = `${r.brand || ""} QR가입${r.consentNight === "Y" ? " / 야간수신동의" : ""}`; // 비고
     lines.push(row.map(v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`).join(","));
   });
