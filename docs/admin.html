@@ -54,6 +54,9 @@
   tr.is-paid td { background: #f2faf5; }
   tr.is-paid:hover td { background: #eaf6ef; }
   .card .v.paidnum { color: var(--teal); }
+  .card .v.errnum { color: #d64545; }
+  td.birth-err { color: #d64545; font-weight: 700; }
+  td.birth-err::after { content: " ⚠"; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -80,12 +83,14 @@
       <div class="card"><div class="k">오늘 신규</div><div class="v" id="stToday">-</div></div>
       <div class="card"><div class="k">최근 7일</div><div class="v" id="stWeek">-</div></div>
       <div class="card"><div class="k">적립금 지급 완료</div><div class="v paidnum" id="stPaid">-</div></div>
+      <div class="card"><div class="k">생년월일 확인필요</div><div class="v errnum" id="stBirthErr">-</div></div>
     </div>
     <div class="filters">
       <select id="fBrand"><option value="">브랜드 전체</option><option>시티브리즈</option><option>아티드</option></select>
       <select id="fStore"><option value="">매장 전체</option></select>
       <select id="fMkt"><option value="">마케팅동의 전체</option><option value="Y">동의</option><option value="N">미동의</option></select>
       <select id="fPaid"><option value="">적립지급 전체</option><option value="paid">지급 완료</option><option value="unpaid">미지급</option></select>
+      <select id="fBirth"><option value="">생년월일 전체</option><option value="ok">정상</option><option value="err">확인필요(오류)</option></select>
       <input type="text" id="fSearch" placeholder="이름 / 전화번호 검색">
     </div>
     <div class="count-note" id="countNote"></div>
@@ -114,8 +119,14 @@ window.EE_STORES.forEach(s => {
   o.value = s.name; o.textContent = `[${s.brandKo}] ${s.name}`;
   fs.appendChild(o);
 });
-["fBrand","fStore","fMkt","fPaid"].forEach(id => document.getElementById(id).addEventListener("change", renderTable));
+["fBrand","fStore","fMkt","fPaid","fBirth"].forEach(id => document.getElementById(id).addEventListener("change", renderTable));
 document.getElementById("fSearch").addEventListener("input", renderTable);
+
+// 생년월일 유효성: 6자리(YYMMDD) 또는 8자리(YYYYMMDD) 숫자만 정상
+function isBirthValid(v) {
+  const s = String(v || "").replace(/\D/g, "");
+  return s.length === 6 || s.length === 8;
+}
 
 if (TOKEN) { showMain(); }
 
@@ -203,6 +214,8 @@ function renderStats() {
   const paid = ROWS.filter(r => r.paid === "V").length;
   document.getElementById("stPaid").innerHTML = paid.toLocaleString() +
     ` <small>/ 미지급 ${(ROWS.length - paid).toLocaleString()}</small>`;
+  const berr = ROWS.filter(r => !isBirthValid(r.birth)).length;
+  document.getElementById("stBirthErr").textContent = berr.toLocaleString();
 }
 
 function esc(v) { return String(v == null ? "" : v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -212,11 +225,13 @@ function renderTable() {
   const s = document.getElementById("fStore").value;
   const m = document.getElementById("fMkt").value;
   const pd = document.getElementById("fPaid").value;
+  const bd = document.getElementById("fBirth").value;
   const q = document.getElementById("fSearch").value.trim();
   const list = ROWS.filter(r =>
     (!b || r.brand === b) && (!s || r.storeName === s) &&
     (!m || r.consentMarketing === m) &&
     (!pd || (pd === "paid" ? r.paid === "V" : r.paid !== "V")) &&
+    (!bd || (bd === "err" ? !isBirthValid(r.birth) : isBirthValid(r.birth))) &&
     (!q || (r.name||"").includes(q) || (r.phone||"").includes(q))
   ).sort((a,b2) => String(b2.joinedAt).localeCompare(String(a.joinedAt)));
 
@@ -236,7 +251,7 @@ function renderTable() {
     <td>${esc(r.storeName)}</td>
     <td>${esc(r.name)}</td>
     <td>${esc(r.phone)}</td>
-    <td>${esc(r.birth)}</td>
+    <td class="${isBirthValid(r.birth)?"":"birth-err"}">${esc(r.birth)}</td>
     <td>${esc(r.gender)}</td>
     <td><span class="pill ${r.consentMarketing==="Y"?"y":"n"}">${r.consentMarketing==="Y"?"동의":"미동의"}</span></td>
     <td><span class="pill ${r.consentNight==="Y"?"y":"n"}">${r.consentNight==="Y"?"동의":"미동의"}</span></td>
@@ -278,38 +293,50 @@ function toErpStore(storeId, storeName) {
 
 // 회원등록용 데이터 행 생성 (필수 누락자는 skipped로 분리)
 function buildRegRows() {
-  const skipped = [];
+  const skipped = [];   // 필수(성명·전화·매장·가입일자) 누락 → 제외
+  const birthWarn = []; // 생년월일 형식 오류 → 원본 그대로 포함(다운은 됨)
   const rows = [];
   ROWS.forEach(r => {
-    const birth = toBirth8(r.birth);
     const store = toErpStore(r.storeId, r.storeName);
     const joined = String(r.joinedAt || "").slice(0, 10).replace(/-/g, ""); // 20260722
     const miss = [];
     if (!r.name) miss.push("성명");
     if (!r.phone) miss.push("전화번호");
-    if (!birth) miss.push("생년월일");
     if (!store) miss.push("가입매장코드");
     if (!joined) miss.push("가입일자");
     if (miss.length) { skipped.push(`${r.name || "(이름없음)"} / ${r.phone || "-"} — ${miss.join("·")} 없음`); return; }
+
+    // 생년월일: 정상이면 8자리 변환, 오류여도 원본 숫자 그대로 넣고 경고만
+    let birth;
+    if (isBirthValid(r.birth)) {
+      birth = toBirth8(r.birth);
+    } else {
+      birth = String(r.birth || "").replace(/\D/g, "");
+      birthWarn.push(`${r.name} / ${r.phone} — 생년월일 "${r.birth || "(없음)"}"`);
+    }
 
     const row = new Array(REG_HEADER.length).fill("");
     row[0] = r.name;                                 // 성명 (필수)
     row[1] = toGenderCode(r.gender);                 // 성별 (필수) 여0/남1/미선택0
     row[2] = r.phone;                                // 이동전화번호 (필수)
-    row[4] = birth;                                  // 생년월일 (필수) YYYYMMDD
+    row[4] = birth;                                  // 생년월일 YYYYMMDD (오류는 원본)
     row[7] = store;                                  // 가입매장 (필수) ERP코드
     row[8] = joined;                                 // 가입일자 (필수) YYYYMMDD
     row[9] = r.consentMarketing === "Y" ? "Y" : "N"; // SMS수신 ← 마케팅 수신 동의
     row[29] = `${r.brand || ""} QR가입${r.consentNight === "Y" ? " / 야간수신동의" : ""}`; // 비고
     rows.push(row);
   });
-  return { rows, skipped };
+  return { rows, skipped, birthWarn };
 }
 
-function afterRegDownload(count, skipped, kind) {
+function afterRegDownload(count, skipped, birthWarn, kind) {
   let msg = `회원등록용 ${kind} ${count}명 다운로드 완료`;
+  if (birthWarn.length) {
+    msg += `\n\n⚠ 생년월일 형식 확인 필요 ${birthWarn.length}명 (그대로 포함됨):\n` + birthWarn.join("\n")
+        + `\n\n→ ‘생년월일 확인필요(오류)’ 필터로 찾아 수정할 수 있습니다.`;
+  }
   if (skipped.length) {
-    msg += `\n\n⚠ 필수항목 누락으로 제외된 ${skipped.length}명:\n` + skipped.join("\n")
+    msg += `\n\n❌ 필수항목 누락으로 제외된 ${skipped.length}명:\n` + skipped.join("\n")
         + `\n\n→ 시트에서 해당 정보를 채운 뒤 다시 받아주세요.`;
   }
   alert(msg);
@@ -317,7 +344,7 @@ function afterRegDownload(count, skipped, kind) {
 
 // 엑셀(.xlsx) 다운로드 — 모든 칸을 텍스트로(선행0·전화번호·YYYYMMDD 보존)
 function downloadRegXlsx() {
-  const { rows, skipped } = buildRegRows();
+  const { rows, skipped, birthWarn } = buildRegRows();
   if (!rows.length) { alert("등록 가능한 회원이 없습니다."); return; }
 
   const aoa = [REG_HEADER, ...rows];
@@ -334,7 +361,7 @@ function downloadRegXlsx() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "회원등록");
   XLSX.writeFile(wb, `DD회원등록_${todayStr().replace(/-/g, "")}.xlsx`);
-  afterRegDownload(rows.length, skipped, "엑셀");
+  afterRegDownload(rows.length, skipped, birthWarn, "엑셀");
 }
 
 function downloadCsv() {
