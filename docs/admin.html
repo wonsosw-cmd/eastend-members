@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <title>멤버십 관리자</title>
 <style>
   :root { --navy: #1b2a4a; --teal: #2a9d8f; --amber: #e9a13b; --bg: #f2f4f7; --line: #e4e8ee; --muted: #8a93a5; }
@@ -46,6 +47,13 @@
   .pill.n { background: #f3f4f6; color: var(--muted); }
   .empty { padding: 44px; text-align: center; color: var(--muted); font-size: 14px; }
   .count-note { font-size: 12.5px; color: var(--muted); margin: 10px 2px; }
+  /* 적립지급 체크 */
+  td.paid-cell { text-align: center; }
+  .paid-chk { width: 22px; height: 22px; cursor: pointer; accent-color: var(--teal); vertical-align: middle; }
+  .paid-v { display: inline-block; min-width: 46px; text-align: center; font-weight: 800; font-size: 14px; color: var(--teal); }
+  tr.is-paid td { background: #f2faf5; }
+  tr.is-paid:hover td { background: #eaf6ef; }
+  .card .v.paidnum { color: var(--teal); }
 </style>
 </head>
 <body>
@@ -61,7 +69,7 @@
   <header>
     <h1>EASTEND 오프라인 멤버십 관리</h1>
     <div class="sp"></div>
-    <button class="primary" onclick="downloadRegCsv()">📋 회원등록용 CSV</button>
+    <button class="primary" onclick="downloadRegXlsx()">📋 회원등록용 엑셀</button>
     <button onclick="downloadCsv()">전체 CSV</button>
     <button onclick="loadData()">새로고침</button>
     <button onclick="logout()">로그아웃</button>
@@ -71,22 +79,23 @@
       <div class="card"><div class="k">전체 회원</div><div class="v" id="stTotal">-</div></div>
       <div class="card"><div class="k">오늘 신규</div><div class="v" id="stToday">-</div></div>
       <div class="card"><div class="k">최근 7일</div><div class="v" id="stWeek">-</div></div>
-      <div class="card"><div class="k">마케팅 수신 동의</div><div class="v" id="stMkt">-</div></div>
+      <div class="card"><div class="k">적립금 지급 완료</div><div class="v paidnum" id="stPaid">-</div></div>
     </div>
     <div class="filters">
       <select id="fBrand"><option value="">브랜드 전체</option><option>시티브리즈</option><option>아티드</option></select>
       <select id="fStore"><option value="">매장 전체</option></select>
       <select id="fMkt"><option value="">마케팅동의 전체</option><option value="Y">동의</option><option value="N">미동의</option></select>
+      <select id="fPaid"><option value="">적립지급 전체</option><option value="paid">지급 완료</option><option value="unpaid">미지급</option></select>
       <input type="text" id="fSearch" placeholder="이름 / 전화번호 검색">
     </div>
     <div class="count-note" id="countNote"></div>
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>가입일시</th><th>브랜드</th><th>매장</th><th>이름</th><th>휴대전화</th>
+          <th>적립지급</th><th>가입일시</th><th>브랜드</th><th>매장</th><th>이름</th><th>휴대전화</th>
           <th>생년월일</th><th>성별</th><th>마케팅동의</th><th>야간동의</th><th>최근방문</th><th>방문횟수</th>
         </tr></thead>
-        <tbody id="tbody"><tr><td colspan="10" class="empty">데이터를 불러오는 중...</td></tr></tbody>
+        <tbody id="tbody"><tr><td colspan="12" class="empty">데이터를 불러오는 중...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -105,7 +114,7 @@ window.EE_STORES.forEach(s => {
   o.value = s.name; o.textContent = `[${s.brandKo}] ${s.name}`;
   fs.appendChild(o);
 });
-["fBrand","fStore","fMkt"].forEach(id => document.getElementById(id).addEventListener("change", renderTable));
+["fBrand","fStore","fMkt","fPaid"].forEach(id => document.getElementById(id).addEventListener("change", renderTable));
 document.getElementById("fSearch").addEventListener("input", renderTable);
 
 if (TOKEN) { showMain(); }
@@ -143,15 +152,38 @@ async function api(action, token) {
 }
 
 async function loadData() {
-  document.getElementById("tbody").innerHTML = '<tr><td colspan="10" class="empty">데이터를 불러오는 중...</td></tr>';
+  document.getElementById("tbody").innerHTML = '<tr><td colspan="12" class="empty">데이터를 불러오는 중...</td></tr>';
   try {
     const j = await api("list", TOKEN);
     if (j.result !== "ok") throw new Error(j.message);
     ROWS = j.rows;
     renderAll();
   } catch (e) {
-    document.getElementById("tbody").innerHTML = `<tr><td colspan="10" class="empty">불러오기 실패: ${e.message}<br>토큰이 만료되었으면 로그아웃 후 다시 접속해주세요.</td></tr>`;
+    document.getElementById("tbody").innerHTML = `<tr><td colspan="12" class="empty">불러오기 실패: ${e.message}<br>토큰이 만료되었으면 로그아웃 후 다시 접속해주세요.</td></tr>`;
   }
+}
+
+// 적립금 지급 여부 토글 (시트에 저장)
+async function togglePaid(phone, checked, el) {
+  el.disabled = true;
+  try {
+    const res = await fetch(window.EE_CONFIG.API_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "mark_paid", token: TOKEN, phone, paid: checked }),
+    });
+    const j = await res.json();
+    if (j.result !== "ok") throw new Error(j.message);
+    const row = ROWS.find(r => r.phone === phone);
+    if (row) row.paid = j.paid;
+    renderStats();
+    const tr = el.closest("tr");
+    if (tr) tr.classList.toggle("is-paid", !!j.paid);
+    // 미지급 필터 상태에서 지급 처리하면 목록에서 빠지도록 재렌더
+    if (document.getElementById("fPaid").value) renderTable();
+  } catch (e) {
+    el.checked = !checked;
+    alert("저장 실패: " + e.message + "\n다시 시도해주세요.");
+  } finally { el.disabled = false; }
 }
 
 function renderAll() { renderStats(); renderTable(); }
@@ -168,38 +200,50 @@ function renderStats() {
   document.getElementById("stTotal").textContent = ROWS.length.toLocaleString();
   document.getElementById("stToday").textContent = ROWS.filter(r => ymd(r.joinedAt) === today).length.toLocaleString();
   document.getElementById("stWeek").textContent = ROWS.filter(r => new Date(ymd(r.joinedAt)) >= week).length.toLocaleString();
-  const mkt = ROWS.filter(r => r.consentMarketing === "Y").length;
-  document.getElementById("stMkt").innerHTML = mkt.toLocaleString() +
-    ` <small>(${ROWS.length ? Math.round(mkt/ROWS.length*100) : 0}%)</small>`;
+  const paid = ROWS.filter(r => r.paid === "V").length;
+  document.getElementById("stPaid").innerHTML = paid.toLocaleString() +
+    ` <small>/ 미지급 ${(ROWS.length - paid).toLocaleString()}</small>`;
 }
+
+function esc(v) { return String(v == null ? "" : v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
 function renderTable() {
   const b = document.getElementById("fBrand").value;
   const s = document.getElementById("fStore").value;
   const m = document.getElementById("fMkt").value;
+  const pd = document.getElementById("fPaid").value;
   const q = document.getElementById("fSearch").value.trim();
   const list = ROWS.filter(r =>
     (!b || r.brand === b) && (!s || r.storeName === s) &&
     (!m || r.consentMarketing === m) &&
+    (!pd || (pd === "paid" ? r.paid === "V" : r.paid !== "V")) &&
     (!q || (r.name||"").includes(q) || (r.phone||"").includes(q))
   ).sort((a,b2) => String(b2.joinedAt).localeCompare(String(a.joinedAt)));
 
   document.getElementById("countNote").textContent = `${list.length.toLocaleString()}명 표시 중 (전체 ${ROWS.length.toLocaleString()}명)`;
   const tb = document.getElementById("tbody");
-  if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="empty">조건에 맞는 회원이 없습니다.</td></tr>'; return; }
-  tb.innerHTML = list.map(r => `<tr>
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="12" class="empty">조건에 맞는 회원이 없습니다.</td></tr>'; return; }
+  tb.innerHTML = list.map(r => {
+    const paid = r.paid === "V";
+    const pj = esc(r.phone);
+    return `<tr class="${paid?"is-paid":""}">
+    <td class="paid-cell">
+      <input type="checkbox" class="paid-chk" ${paid?"checked":""} onchange="togglePaid('${pj}', this.checked, this)">
+      ${paid ? '<span class="paid-v">V</span>' : ''}
+    </td>
     <td>${String(r.joinedAt).slice(0,16).replace("T"," ")}</td>
-    <td><span class="pill ${r.brand==="아티드"?"artid":"city"}">${r.brand||""}</span></td>
-    <td>${r.storeName||""}</td>
-    <td>${r.name||""}</td>
-    <td>${r.phone||""}</td>
-    <td>${r.birth||""}</td>
-    <td>${r.gender||""}</td>
+    <td><span class="pill ${r.brand==="아티드"?"artid":"city"}">${esc(r.brand)}</span></td>
+    <td>${esc(r.storeName)}</td>
+    <td>${esc(r.name)}</td>
+    <td>${esc(r.phone)}</td>
+    <td>${esc(r.birth)}</td>
+    <td>${esc(r.gender)}</td>
     <td><span class="pill ${r.consentMarketing==="Y"?"y":"n"}">${r.consentMarketing==="Y"?"동의":"미동의"}</span></td>
     <td><span class="pill ${r.consentNight==="Y"?"y":"n"}">${r.consentNight==="Y"?"동의":"미동의"}</span></td>
     <td>${String(r.lastVisit||"").slice(0,10)}</td>
     <td>${r.visitCount||1}</td>
-  </tr>`).join("");
+  </tr>`;
+  }).join("");
 }
 
 // ── 회원등록용 CSV (DD고객엑셀파일양식) ─────────────────────
@@ -232,15 +276,14 @@ function toErpStore(storeId, storeName) {
   return (byName && byName.erp) || "";
 }
 
-function downloadRegCsv() {
+// 회원등록용 데이터 행 생성 (필수 누락자는 skipped로 분리)
+function buildRegRows() {
   const skipped = [];
-  const lines = [REG_HEADER.join(",")];
-
+  const rows = [];
   ROWS.forEach(r => {
     const birth = toBirth8(r.birth);
     const store = toErpStore(r.storeId, r.storeName);
-    const joined = String(r.joinedAt || "").slice(0, 10);
-    // 필수 누락 시 제외하고 사유 안내
+    const joined = String(r.joinedAt || "").slice(0, 10).replace(/-/g, ""); // 20260722
     const miss = [];
     if (!r.name) miss.push("성명");
     if (!r.phone) miss.push("전화번호");
@@ -250,31 +293,48 @@ function downloadRegCsv() {
     if (miss.length) { skipped.push(`${r.name || "(이름없음)"} / ${r.phone || "-"} — ${miss.join("·")} 없음`); return; }
 
     const row = new Array(REG_HEADER.length).fill("");
-    row[0] = r.name;                              // 성명 (필수)
-    row[1] = toGenderCode(r.gender);              // 성별 (필수) 여0/남1/미선택0
-    row[2] = r.phone;                             // 이동전화번호 (필수)
-    row[4] = birth;                               // 생년월일 (필수) YYYYMMDD
-    row[7] = store;                               // 가입매장 (필수) ERP코드
-    row[8] = joined;                              // 가입일자 (필수) YYYY-MM-DD
+    row[0] = r.name;                                 // 성명 (필수)
+    row[1] = toGenderCode(r.gender);                 // 성별 (필수) 여0/남1/미선택0
+    row[2] = r.phone;                                // 이동전화번호 (필수)
+    row[4] = birth;                                  // 생년월일 (필수) YYYYMMDD
+    row[7] = store;                                  // 가입매장 (필수) ERP코드
+    row[8] = joined;                                 // 가입일자 (필수) YYYYMMDD
     row[9] = r.consentMarketing === "Y" ? "Y" : "N"; // SMS수신 ← 마케팅 수신 동의
     row[29] = `${r.brand || ""} QR가입${r.consentNight === "Y" ? " / 야간수신동의" : ""}`; // 비고
-    lines.push(row.map(v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`).join(","));
+    rows.push(row);
   });
+  return { rows, skipped };
+}
 
-  if (lines.length === 1) { alert("등록 가능한 회원이 없습니다."); return; }
-
-  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `DD회원등록_${todayStr().replace(/-/g, "")}.csv`;
-  a.click();
-
-  let msg = `회원등록용 CSV ${lines.length - 1}명 다운로드 완료`;
+function afterRegDownload(count, skipped, kind) {
+  let msg = `회원등록용 ${kind} ${count}명 다운로드 완료`;
   if (skipped.length) {
     msg += `\n\n⚠ 필수항목 누락으로 제외된 ${skipped.length}명:\n` + skipped.join("\n")
         + `\n\n→ 시트에서 해당 정보를 채운 뒤 다시 받아주세요.`;
   }
   alert(msg);
+}
+
+// 엑셀(.xlsx) 다운로드 — 모든 칸을 텍스트로(선행0·전화번호·YYYYMMDD 보존)
+function downloadRegXlsx() {
+  const { rows, skipped } = buildRegRows();
+  if (!rows.length) { alert("등록 가능한 회원이 없습니다."); return; }
+
+  const aoa = [REG_HEADER, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  // 전 셀 텍스트 서식(숫자 자동변환 방지)
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+  for (let R = 0; R <= range.e.r; R++) {
+    for (let C = 0; C <= range.e.c; C++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (cell && cell.v !== "") { cell.t = "s"; cell.v = String(cell.v); cell.z = "@"; }
+    }
+  }
+  ws["!cols"] = [{wch:10},{wch:6},{wch:15},{wch:8},{wch:10},{wch:8},{wch:8},{wch:9},{wch:11},{wch:8}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "회원등록");
+  XLSX.writeFile(wb, `DD회원등록_${todayStr().replace(/-/g, "")}.xlsx`);
+  afterRegDownload(rows.length, skipped, "엑셀");
 }
 
 function downloadCsv() {

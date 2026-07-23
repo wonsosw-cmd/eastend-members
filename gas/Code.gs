@@ -26,7 +26,7 @@ function setup() {
     sh.appendRow([
       "가입일시", "브랜드", "매장코드", "매장명", "이름", "휴대전화",
       "생년월일", "성별", "개인정보동의", "마케팅동의", "동의일시",
-      "최근방문", "방문횟수", "UserAgent", "야간광고동의"
+      "최근방문", "방문횟수", "UserAgent", "야간광고동의", "적립지급"
     ]);
     sh.setFrozenRows(1);
   }
@@ -287,6 +287,7 @@ function doPost(e) {
     var action = String(p.action || "");
 
     if (action === "join") return handleJoin_(p);
+    if (action === "mark_paid") return handleMarkPaid_(p);
     // 포인트(적립·조회·차감)는 외부 판매 프로그램에서 처리 — 이 시스템은 가입 접수 전용
     if (action === "receipt" || action === "staff_earn" || action === "staff_lookup" || action === "staff_redeem") {
       return json_({ result: "error", message: "포인트 적립·조회·사용은 매장 판매 프로그램에서 처리됩니다" });
@@ -346,6 +347,17 @@ function handleJoin_(p) {
   }
 
   return json_({ result: "ok", status: status, receipt: receipt });
+}
+
+// 관리자: 적립금 지급 여부 표시 (회원 시트 P열 "V")
+function handleMarkPaid_(p) {
+  if (p.token !== props_().getProperty("ADMIN_TOKEN")) return json_({ result: "error", message: "unauthorized" });
+  var phone = String(p.phone || "").trim();
+  var found = findMember_(phone);
+  if (!found[0]) return json_({ result: "error", message: "회원을 찾을 수 없습니다" });
+  var val = p.paid ? "V" : "";
+  sheet_(SHEET_MEMBER).getRange(found[0], 16).setValue(val);
+  return json_({ result: "ok", paid: val });
 }
 
 // 기존 회원 영수증 적립 신청 (receipt.html)
@@ -439,14 +451,15 @@ function doGet(e) {
     var last = sh.getLastRow();
     var rows = [];
     if (last >= 2) {
-      var vals = sh.getRange(2, 1, last - 1, 15).getValues();
+      var vals = sh.getRange(2, 1, last - 1, 16).getValues();
       rows = vals.map(function (v) {
         return {
           joinedAt: toIso_(v[0]), brand: v[1], storeId: v[2], storeName: v[3],
           name: v[4], phone: String(v[5]), birth: String(v[6]), gender: v[7],
           consentPrivacy: v[8], consentMarketing: v[9],
           lastVisit: toIso_(v[11]), visitCount: v[12],
-          consentNight: v[14] || "N"
+          consentNight: v[14] || "N",
+          paid: String(v[15] || "").trim() === "V" ? "V" : ""
         };
       });
     }
