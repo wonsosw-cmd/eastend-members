@@ -327,15 +327,22 @@ function handleJoin_(p) {
     status = "existing";
     name = found[1]; // 시트 등록명 기준
   } else {
+    // 서버측 이중검증: 생년월일 6자리(YYMMDD)
+    var birth = String(p.birth || "").replace(/\D/g, "");
+    if (!/^\d{6}$/.test(birth)) return json_({ result: "error", message: "생년월일 6자리(YYMMDD)를 입력해주세요" });
+
     sh.appendRow([
       now, String(p.brand || ""), String(p.storeId || ""), String(p.storeName || ""),
-      name, phone, String(p.birth || ""), String(p.gender || ""),
+      name, phone, birth, String(p.gender || ""),
       "Y", p.consentMarketing === true ? "Y" : "N", now, now, 1,
       String(p.ua || "").slice(0, 200),
       p.consentNight === true ? "Y" : "N"
     ]);
     var r = sh.getLastRow();
+    // 전화·생년월일을 텍스트로 강제 (041021 같은 앞자리 0 보존)
     sh.getRange(r, 6, 1, 2).setNumberFormat("@");
+    sh.getRange(r, 6).setValue(phone);
+    sh.getRange(r, 7).setValue(birth);
     status = "new";
     // 포인트(웰컴 3,000P 포함)는 외부 판매 프로그램에서 지급·관리
   }
