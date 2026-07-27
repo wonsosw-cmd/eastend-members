@@ -276,6 +276,22 @@ document.getElementById("fBirth").addEventListener("input", e => {
   e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
 });
 
+// 필수 항목(매장·이름·전화·생년월일 6자리·개인정보 동의)이 모두 채워질 때까지 '가입하기' 비활성화
+function updateSubmitState() {
+  const name = document.getElementById("fName").value.trim();
+  const phone = document.getElementById("fPhone").value.trim();
+  const birth = document.getElementById("fBirth").value.trim();
+  const okPrivacy = document.getElementById("cPrivacy").checked;
+  const ready = !!store && !!name &&
+    /^01[016789]-\d{3,4}-\d{4}$/.test(phone) &&
+    /^\d{6}$/.test(birth) && okPrivacy;
+  document.getElementById("btnSubmit").disabled = !ready;
+}
+// 폼 안의 모든 입력·체크 변화에 반응
+document.getElementById("joinForm").addEventListener("input", updateSubmitState);
+document.getElementById("joinForm").addEventListener("change", updateSubmitState);
+updateSubmitState(); // 초기 상태(비활성)
+
 function rowClick(ev, id) {
   if (ev.target.tagName === "BUTTON" || ev.target.tagName === "INPUT") { syncAll(); return; }
   const cb = document.getElementById(id);
@@ -286,6 +302,7 @@ function toggleAll(ev) {
   const all = document.getElementById("cAll");
   if (ev.target.tagName !== "INPUT") all.checked = !all.checked;
   ["cPrivacy", "cMkt", "cNight"].forEach(id => document.getElementById(id).checked = all.checked);
+  syncAll();
 }
 function syncAll() {
   // 야간 수신은 마케팅 수신 동의가 전제
@@ -294,6 +311,7 @@ function syncAll() {
   }
   document.getElementById("cAll").checked =
     ["cPrivacy", "cMkt", "cNight"].every(id => document.getElementById(id).checked);
+  updateSubmitState();
 }
 ["cPrivacy", "cMkt", "cNight"].forEach(id =>
   document.getElementById(id).addEventListener("change", syncAll));
