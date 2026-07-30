@@ -122,17 +122,20 @@ window.EE_STORES.forEach(s => {
 ["fBrand","fStore","fMkt","fPaid","fBirth"].forEach(id => document.getElementById(id).addEventListener("change", renderTable));
 document.getElementById("fSearch").addEventListener("input", renderTable);
 
-// 생년월일 정규화: 시트 저장 시 앞자리 0이 날아간 경우(041021→41021) 복원
-// 4~5자리 숫자는 앞을 0으로 채워 6자리로 (2000년대 초반생 YY=00~09)
+// 생년월일 정규화: 시트 저장 시 앞자리 0이 날아간 경우 복원
+// 1~5자리 숫자는 앞을 0으로 채워 6자리로 (041021→41021, 000131→131 등)
 function normBirth(v) {
   let s = String(v || "").replace(/\D/g, "");
-  if (s.length >= 4 && s.length <= 5) s = s.padStart(6, "0");
+  if (s.length >= 1 && s.length <= 5) s = s.padStart(6, "0");
   return s;
 }
-// 유효성: 정규화 후 6자리(YYMMDD) 또는 8자리(YYYYMMDD)면 정상
+// 유효성: 정규화 후 8자리(YYYYMMDD)거나, 6자리(YYMMDD)이면서 월·일이 유효
 function isBirthValid(v) {
   const s = normBirth(v);
-  return s.length === 6 || s.length === 8;
+  if (s.length === 8) return true;
+  if (s.length !== 6) return false;
+  const mm = Number(s.slice(2, 4)), dd = Number(s.slice(4, 6));
+  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31;
 }
 
 if (TOKEN) { showMain(); }
