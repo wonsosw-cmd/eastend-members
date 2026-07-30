@@ -57,6 +57,23 @@
   .card .v.errnum { color: #d64545; }
   td.birth-err { color: #d64545; font-weight: 700; }
   td.birth-err::after { content: " ⚠"; font-size: 11px; }
+  /* 매장별 통계 */
+  .store-stats { background: #fff; border-radius: 14px; box-shadow: 0 2px 8px rgba(27,42,74,.06); margin-bottom: 20px; overflow: hidden; }
+  .ss-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; font-weight: 800; font-size: 14px; border-bottom: 1px solid var(--line); }
+  .ss-head .sp { flex: 1; }
+  .ss-head .hint { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .ss-toggle { background: #eef1f6; border: none; border-radius: 8px; padding: 6px 12px; font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--navy); cursor: pointer; }
+  .ss-body { max-height: 360px; overflow: auto; }
+  .ss-table { min-width: 560px; }
+  .ss-table th.num, .ss-table td.num { text-align: right; }
+  .ss-table td.num b { font-size: 14.5px; }
+  .ss-table tbody tr { cursor: pointer; }
+  .ss-table tbody tr:hover td { background: #f4f8f7; }
+  .ss-table tfoot td { font-weight: 800; background: #f8f9fb; border-top: 2px solid var(--line); }
+  .ss-name { display: flex; flex-direction: column; gap: 5px; }
+  .ss-bar { height: 4px; width: 120px; background: #eef1f6; border-radius: 3px; overflow: hidden; }
+  .ss-bar span { display: block; height: 100%; background: var(--teal); }
+  .ss-zero { color: #cdd3dd; }
 </style>
 </head>
 <body>
@@ -84,6 +101,26 @@
       <div class="card"><div class="k">최근 7일</div><div class="v" id="stWeek">-</div></div>
       <div class="card"><div class="k">적립금 지급 완료</div><div class="v paidnum" id="stPaid">-</div></div>
       <div class="card"><div class="k">생년월일 확인필요</div><div class="v errnum" id="stBirthErr">-</div></div>
+    </div>
+    <div class="store-stats" id="storeStats">
+      <div class="ss-head">
+        <span>🏬 매장별 가입 통계</span>
+        <span class="hint">행을 클릭하면 해당 매장으로 목록이 필터링됩니다</span>
+        <div class="sp"></div>
+        <button class="ss-toggle" id="ssToggle" onclick="toggleStoreStats()">숨기기</button>
+      </div>
+      <div class="ss-body" id="ssBody">
+        <div class="tbl-wrap" style="box-shadow:none;border-radius:0;">
+          <table class="ss-table">
+            <thead><tr>
+              <th>매장</th><th>브랜드</th><th class="num">전체 가입</th>
+              <th class="num">오늘</th><th class="num">최근 7일</th><th class="num">적립지급</th>
+            </tr></thead>
+            <tbody id="ssTbody"></tbody>
+            <tfoot id="ssTfoot"></tfoot>
+          </table>
+        </div>
+      </div>
     </div>
     <div class="filters">
       <select id="fBrand"><option value="">브랜드 전체</option><option>시티브리즈</option><option>아티드</option></select>
@@ -207,7 +244,64 @@ async function togglePaid(phone, checked, el) {
   } finally { el.disabled = false; }
 }
 
-function renderAll() { renderStats(); renderTable(); }
+function renderAll() { renderStats(); renderStoreStats(); renderTable(); }
+
+// 매장별 가입 통계
+function renderStoreStats() {
+  const today = todayStr();
+  const week = new Date(Date.now() - 6*86400000);
+  const map = new Map();
+  ROWS.forEach(r => {
+    const key = r.storeName || "(미지정)";
+    if (!map.has(key)) map.set(key, { name: key, brand: r.brand || "", total: 0, today: 0, week: 0, paid: 0 });
+    const o = map.get(key);
+    o.total++;
+    if (ymd(r.joinedAt) === today) o.today++;
+    if (new Date(ymd(r.joinedAt)) >= week) o.week++;
+    if (r.paid === "V") o.paid++;
+    if (!o.brand && r.brand) o.brand = r.brand;
+  });
+  const arr = [...map.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  const tb = document.getElementById("ssTbody");
+  const tf = document.getElementById("ssTfoot");
+  if (!arr.length) { tb.innerHTML = '<tr><td colspan="6" class="empty">데이터 없음</td></tr>'; tf.innerHTML = ""; return; }
+  const max = arr[0].total || 1;
+  const num = (n) => n ? n.toLocaleString() : '<span class="ss-zero">0</span>';
+  tb.innerHTML = arr.map(o => `
+    <tr onclick="filterByStore(${JSON.stringify(o.name)})">
+      <td><div class="ss-name">${esc(o.name)}<div class="ss-bar"><span style="width:${Math.max(3, Math.round(o.total/max*100))}%"></span></div></div></td>
+      <td><span class="pill ${o.brand==="아티드"?"artid":"city"}">${esc(o.brand)}</span></td>
+      <td class="num"><b>${o.total.toLocaleString()}</b></td>
+      <td class="num">${num(o.today)}</td>
+      <td class="num">${num(o.week)}</td>
+      <td class="num">${num(o.paid)}</td>
+    </tr>`).join("");
+  const sum = arr.reduce((a, o) => ({ total: a.total+o.total, today: a.today+o.today, week: a.week+o.week, paid: a.paid+o.paid }), { total:0, today:0, week:0, paid:0 });
+  tf.innerHTML = `<tr>
+    <td>합계 (${arr.length}개 매장)</td><td></td>
+    <td class="num">${sum.total.toLocaleString()}</td>
+    <td class="num">${sum.today.toLocaleString()}</td>
+    <td class="num">${sum.week.toLocaleString()}</td>
+    <td class="num">${sum.paid.toLocaleString()}</td>
+  </tr>`;
+}
+
+// 통계 행 클릭 → 해당 매장으로 회원 목록 필터
+function filterByStore(name) {
+  const sel = document.getElementById("fStore");
+  if ([...sel.options].some(o => o.value === name)) sel.value = name;
+  else { const o = document.createElement("option"); o.value = name; o.textContent = name; sel.appendChild(o); sel.value = name; }
+  renderTable();
+  document.getElementById("countNote").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function toggleStoreStats() {
+  const b = document.getElementById("ssBody");
+  const btn = document.getElementById("ssToggle");
+  const hidden = b.style.display === "none";
+  b.style.display = hidden ? "" : "none";
+  btn.textContent = hidden ? "숨기기" : "펼치기";
+}
 
 function ymd(d) { return d ? String(d).slice(0, 10) : ""; }
 function todayStr() {
