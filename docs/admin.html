@@ -74,6 +74,16 @@
   .ss-bar { height: 4px; width: 120px; background: #eef1f6; border-radius: 3px; overflow: hidden; }
   .ss-bar span { display: block; height: 100%; background: var(--teal); }
   .ss-zero { color: #cdd3dd; }
+  .ss-range { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--navy); }
+  .ss-range input[type=date] { padding: 5px 8px; border: 1.5px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 12.5px; }
+  .ss-range-sum { font-size: 12.5px; font-weight: 800; color: var(--teal); }
+  .ss-hint2 { padding: 8px 18px; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line); background: #fbfcfd; }
+  .ss-table th.ss-th { cursor: pointer; user-select: none; white-space: nowrap; }
+  .ss-table th.ss-th:hover { color: var(--navy); background: #eef1f6; }
+  .ss-arrow { font-size: 10px; color: #c2c9d4; margin-left: 2px; }
+  .ss-table th.ss-th .ss-arrow.on { color: var(--teal); }
+  .ss-table .col-range { background: #eefaf8; }
+  .ss-table tfoot td.col-range { background: #e3f4f1; color: #1d7a70; }
 </style>
 </head>
 <body>
@@ -105,17 +115,21 @@
     <div class="store-stats" id="storeStats">
       <div class="ss-head">
         <span>🏬 매장별 가입 통계</span>
-        <span class="hint">행을 클릭하면 해당 매장으로 목록이 필터링됩니다</span>
         <div class="sp"></div>
+        <label class="ss-range">기간
+          <input type="date" id="ssFrom" onchange="applyRange()">
+          <span>~</span>
+          <input type="date" id="ssTo" onchange="applyRange()">
+        </label>
+        <span class="ss-range-sum" id="ssRangeSum"></span>
+        <button class="ss-toggle" id="ssClear" onclick="clearRange()" style="display:none;">기간 초기화</button>
         <button class="ss-toggle" id="ssToggle" onclick="toggleStoreStats()">숨기기</button>
       </div>
+      <div class="ss-hint2">헤더를 클릭하면 정렬(오름/내림차순), 행을 클릭하면 해당 매장으로 목록이 필터링됩니다</div>
       <div class="ss-body" id="ssBody">
         <div class="tbl-wrap" style="box-shadow:none;border-radius:0;">
           <table class="ss-table">
-            <thead><tr>
-              <th>매장</th><th>브랜드</th><th class="num">전체 가입</th>
-              <th class="num">오늘</th><th class="num">최근 7일</th><th class="num">적립지급</th>
-            </tr></thead>
+            <thead id="ssThead"></thead>
             <tbody id="ssTbody"></tbody>
             <tfoot id="ssTfoot"></tfoot>
           </table>
@@ -246,27 +260,59 @@ async function togglePaid(phone, checked, el) {
 
 function renderAll() { renderStats(); renderStoreStats(); renderTable(); }
 
-// 매장별 가입 통계
+// 매장별 가입 통계 (정렬 + 기간 필터)
+let ssSortKey = "total", ssSortDir = "desc", ssFrom = "", ssTo = "";
+const SS_COLS = [
+  { key: "name",  label: "매장",      num: false },
+  { key: "brand", label: "브랜드",    num: false },
+  { key: "total", label: "전체 가입", num: true },
+  { key: "today", label: "오늘",      num: true },
+  { key: "week",  label: "최근 7일",  num: true },
+  { key: "range", label: "기간 가입", num: true, range: true },
+  { key: "paid",  label: "적립지급",  num: true },
+];
+
 function renderStoreStats() {
   const today = todayStr();
   const week = new Date(Date.now() - 6*86400000);
+  const hasRange = !!(ssFrom || ssTo);
   const map = new Map();
   ROWS.forEach(r => {
     const key = r.storeName || "(미지정)";
-    if (!map.has(key)) map.set(key, { name: key, brand: r.brand || "", total: 0, today: 0, week: 0, paid: 0 });
+    if (!map.has(key)) map.set(key, { name: key, brand: r.brand || "", total: 0, today: 0, week: 0, range: 0, paid: 0 });
     const o = map.get(key);
     o.total++;
-    if (ymd(r.joinedAt) === today) o.today++;
-    if (new Date(ymd(r.joinedAt)) >= week) o.week++;
+    const d = ymd(r.joinedAt);
+    if (d === today) o.today++;
+    if (new Date(d) >= week) o.week++;
+    if (hasRange && (!ssFrom || d >= ssFrom) && (!ssTo || d <= ssTo)) o.range++;
     if (r.paid === "V") o.paid++;
     if (!o.brand && r.brand) o.brand = r.brand;
   });
-  const arr = [...map.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  const arr = [...map.values()].sort((a, b) => {
+    let av = a[ssSortKey], bv = b[ssSortKey], cmp;
+    if (typeof av === "string") cmp = av.localeCompare(bv, "ko");
+    else cmp = (av || 0) - (bv || 0);
+    if (cmp === 0) cmp = a.name.localeCompare(b.name, "ko");
+    return ssSortDir === "asc" ? cmp : -cmp;
+  });
+
+  // 헤더(정렬 화살표)
+  document.getElementById("ssThead").innerHTML = "<tr>" + SS_COLS.map(c => {
+    const on = ssSortKey === c.key;
+    const arrow = on ? (ssSortDir === "asc" ? "▲" : "▼") : "↕";
+    const cls = (c.num ? "num " : "") + "ss-th" + (c.range && hasRange ? " col-range" : "");
+    return `<th class="${cls}" onclick="sortStoreStats('${c.key}')">${c.label}<span class="ss-arrow ${on?"on":""}">${arrow}</span></th>`;
+  }).join("") + "</tr>";
+
   const tb = document.getElementById("ssTbody");
   const tf = document.getElementById("ssTfoot");
-  if (!arr.length) { tb.innerHTML = '<tr><td colspan="6" class="empty">데이터 없음</td></tr>'; tf.innerHTML = ""; return; }
-  const max = arr[0].total || 1;
+  if (!arr.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">데이터 없음</td></tr>'; tf.innerHTML = ""; document.getElementById("ssRangeSum").textContent=""; document.getElementById("ssClear").style.display="none"; return; }
+  const max = Math.max.apply(null, arr.map(o => o.total)) || 1;
   const num = (n) => n ? n.toLocaleString() : '<span class="ss-zero">0</span>';
+  const rangeCell = (o) => hasRange
+    ? `<td class="num col-range"><b>${o.range.toLocaleString()}</b></td>`
+    : `<td class="num"><span class="ss-zero">·</span></td>`;
   tb.innerHTML = arr.map(o => `
     <tr onclick="filterByStore(${JSON.stringify(o.name)})">
       <td><div class="ss-name">${esc(o.name)}<div class="ss-bar"><span style="width:${Math.max(3, Math.round(o.total/max*100))}%"></span></div></div></td>
@@ -274,16 +320,50 @@ function renderStoreStats() {
       <td class="num"><b>${o.total.toLocaleString()}</b></td>
       <td class="num">${num(o.today)}</td>
       <td class="num">${num(o.week)}</td>
+      ${rangeCell(o)}
       <td class="num">${num(o.paid)}</td>
     </tr>`).join("");
-  const sum = arr.reduce((a, o) => ({ total: a.total+o.total, today: a.today+o.today, week: a.week+o.week, paid: a.paid+o.paid }), { total:0, today:0, week:0, paid:0 });
+  const sum = arr.reduce((a, o) => ({ total: a.total+o.total, today: a.today+o.today, week: a.week+o.week, range: a.range+o.range, paid: a.paid+o.paid }), { total:0, today:0, week:0, range:0, paid:0 });
   tf.innerHTML = `<tr>
     <td>합계 (${arr.length}개 매장)</td><td></td>
     <td class="num">${sum.total.toLocaleString()}</td>
     <td class="num">${sum.today.toLocaleString()}</td>
     <td class="num">${sum.week.toLocaleString()}</td>
+    ${hasRange ? `<td class="num col-range">${sum.range.toLocaleString()}</td>` : `<td class="num"><span class="ss-zero">·</span></td>`}
     <td class="num">${sum.paid.toLocaleString()}</td>
   </tr>`;
+
+  const rs = document.getElementById("ssRangeSum");
+  const clr = document.getElementById("ssClear");
+  if (hasRange) {
+    const label = (ssFrom || "처음") + " ~ " + (ssTo || "오늘");
+    rs.textContent = `${label} · ${sum.range.toLocaleString()}명`;
+    clr.style.display = "";
+  } else { rs.textContent = ""; clr.style.display = "none"; }
+}
+
+function sortStoreStats(key) {
+  if (ssSortKey === key) ssSortDir = ssSortDir === "asc" ? "desc" : "asc";
+  else { ssSortKey = key; ssSortDir = (key === "name" || key === "brand") ? "asc" : "desc"; }
+  renderStoreStats();
+}
+function applyRange() {
+  ssFrom = document.getElementById("ssFrom").value;
+  ssTo = document.getElementById("ssTo").value;
+  if (ssFrom && ssTo && ssFrom > ssTo) {
+    const t = ssFrom; ssFrom = ssTo; ssTo = t;
+    document.getElementById("ssFrom").value = ssFrom;
+    document.getElementById("ssTo").value = ssTo;
+  }
+  if (ssFrom || ssTo) { ssSortKey = "range"; ssSortDir = "desc"; }
+  renderStoreStats();
+}
+function clearRange() {
+  ssFrom = ""; ssTo = "";
+  document.getElementById("ssFrom").value = "";
+  document.getElementById("ssTo").value = "";
+  if (ssSortKey === "range") { ssSortKey = "total"; ssSortDir = "desc"; }
+  renderStoreStats();
 }
 
 // 통계 행 클릭 → 해당 매장으로 회원 목록 필터
