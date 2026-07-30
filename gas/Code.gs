@@ -340,7 +340,10 @@ function handleJoin_(p) {
     ]);
     var r = sh.getLastRow();
     // 전화·생년월일을 텍스트로 강제 (041021 같은 앞자리 0 보존)
+    // ★ setNumberFormat 직후 flush() 없이 setValue 하면 값이 숫자로 강제변환되어
+    //    앞자리 0이 손실됨 → flush()로 서식을 먼저 확정한 뒤 값을 기록
     sh.getRange(r, 6, 1, 2).setNumberFormat("@");
+    SpreadsheetApp.flush();
     sh.getRange(r, 6).setValue(phone);
     sh.getRange(r, 7).setValue(birth);
     status = "new";
@@ -462,7 +465,7 @@ function doGet(e) {
       rows = vals.map(function (v) {
         return {
           joinedAt: toIso_(v[0]), brand: v[1], storeId: v[2], storeName: v[3],
-          name: v[4], phone: String(v[5]), birth: String(v[6]), gender: v[7],
+          name: v[4], phone: String(v[5]), birth: normBirth6_(v[6]), gender: v[7],
           consentPrivacy: v[8], consentMarketing: v[9],
           lastVisit: toIso_(v[11]), visitCount: v[12],
           consentNight: v[14] || "N",
@@ -502,4 +505,34 @@ function toIso_(v) {
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// 생년월일 앞자리 0 복원: 시트 저장 시 숫자화되어 앞0이 빠진 값(예: 131)을
+// 6자리로 복원(000131). 가입폼이 6자리를 강제하므로 1~5자리는 앞0 손실분.
+function normBirth6_(v) {
+  var s = String(v == null ? "" : v).replace(/\D/g, "");
+  if (s.length >= 1 && s.length <= 5) s = ("000000" + s).slice(-6);
+  return s;
+}
+
+// 1회 실행용: 회원 시트 G열(생년월일) 기존 값을 6자리 텍스트로 보정.
+// 서식을 텍스트로 확정(flush) 후 setValues 해야 앞0이 유지됨.
+function fixBirthLeadingZeros() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MEMBER);
+  var last = sh.getLastRow();
+  if (last < 2) { Logger.log("데이터 없음"); return; }
+  var rng = sh.getRange(2, 7, last - 1, 1); // G열
+  var vals = rng.getValues();
+  var out = [], fixed = 0;
+  for (var i = 0; i < vals.length; i++) {
+    var orig = String(vals[i][0] == null ? "" : vals[i][0]);
+    var p = normBirth6_(orig);
+    if (p !== orig) fixed++;
+    out.push([p]);
+  }
+  rng.setNumberFormat("@");
+  SpreadsheetApp.flush();
+  rng.setValues(out);
+  SpreadsheetApp.flush();
+  Logger.log("birth 보정 완료: " + fixed + "행 변경 / 총 " + out.length + "행");
 }
