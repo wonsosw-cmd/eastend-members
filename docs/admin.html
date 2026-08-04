@@ -180,13 +180,23 @@ function normBirth(v) {
   if (s.length >= 1 && s.length <= 5) s = s.padStart(6, "0");
   return s;
 }
-// 유효성: 정규화 후 8자리(YYYYMMDD)거나, 6자리(YYMMDD)이면서 월·일이 유효
+// 유효성: 실제 존재하는 날짜인지 검증
+//  - 8자리(YYYYMMDD): 연도 포함이라 윤년까지 정확히 판정
+//  - 6자리(YYMMDD, 구 데이터): 연도 2자리라 세기 모름 → 월별 최대일(2월 29 허용)로 판정
 function isBirthValid(v) {
   const s = normBirth(v);
-  if (s.length === 8) return true;
+  if (s.length === 8) {
+    const y = +s.slice(0, 4), m = +s.slice(4, 6), d = +s.slice(6, 8);
+    if (y < 1900 || y > new Date().getFullYear()) return false;
+    if (m < 1 || m > 12) return false;
+    const leap = (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0));
+    const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return d >= 1 && d <= dim[m - 1];
+  }
   if (s.length !== 6) return false;
   const mm = Number(s.slice(2, 4)), dd = Number(s.slice(4, 6));
-  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31;
+  const dim6 = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= dim6[mm - 1];
 }
 
 if (TOKEN) { showMain(); }

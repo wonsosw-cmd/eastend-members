@@ -327,9 +327,9 @@ function handleJoin_(p) {
     status = "existing";
     name = found[1]; // 시트 등록명 기준
   } else {
-    // 서버측 이중검증: 생년월일 6자리(YYMMDD)
+    // 서버측 이중검증: 생년월일 8자리(YYYYMMDD) + 실제 존재하는 날짜
     var birth = String(p.birth || "").replace(/\D/g, "");
-    if (!/^\d{6}$/.test(birth)) return json_({ result: "error", message: "생년월일 6자리(YYMMDD)를 입력해주세요" });
+    if (!isValidBirth8_(birth)) return json_({ result: "error", message: "생년월일 8자리(YYYYMMDD)를 정확히 입력해주세요" });
 
     sh.appendRow([
       now, String(p.brand || ""), String(p.storeId || ""), String(p.storeName || ""),
@@ -513,6 +513,20 @@ function normBirth6_(v) {
   var s = String(v == null ? "" : v).replace(/\D/g, "");
   if (s.length >= 1 && s.length <= 5) s = ("000000" + s).slice(-6);
   return s;
+}
+
+// 생년월일 8자리(YYYYMMDD)가 실제 존재하는 날짜인지 (윤년·월별 일수·미래 차단)
+function isValidBirth8_(s) {
+  if (!/^\d{8}$/.test(s)) return false;
+  var y = +s.slice(0, 4), m = +s.slice(4, 6), d = +s.slice(6, 8);
+  var now = new Date();
+  var todayNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  if (y < 1900) return false;
+  if (Number(s) > todayNum) return false;
+  if (m < 1 || m > 12) return false;
+  var leap = (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0));
+  var dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return d >= 1 && d <= dim[m - 1];
 }
 
 // 1회 실행용: 회원 시트 G열(생년월일) 기존 값을 6자리 텍스트로 보정.

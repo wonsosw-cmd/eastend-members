@@ -126,9 +126,9 @@
         <div class="err" id="errPhone">올바른 휴대전화번호를 입력해주세요.</div>
       </div>
       <div class="field">
-        <label>생년월일 <b>*</b></label>
-        <input type="text" id="fBirth" placeholder="예: 900101 (6자리)" inputmode="numeric" maxlength="6">
-        <div class="err" id="errBirth">생년월일 6자리(YYMMDD)를 입력해주세요.</div>
+        <label>생년월일 <b>*</b> <span style="color:var(--muted);font-weight:500;">년도 4자리까지 (YYYYMMDD)</span></label>
+        <input type="text" id="fBirth" placeholder="예: 19900101 (8자리)" inputmode="numeric" maxlength="8">
+        <div class="err" id="errBirth">생년월일 8자리(YYYYMMDD)를 입력해주세요.</div>
       </div>
       <div class="field">
         <label>성별 (선택)</label>
@@ -273,10 +273,36 @@ document.getElementById("fPhone").addEventListener("input", e => {
   e.target.value = v;
 });
 document.getElementById("fBirth").addEventListener("input", e => {
-  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 8);
+  updateBirthHint();
 });
 
-// 필수 항목(매장·이름·전화·생년월일 6자리·개인정보 동의)이 모두 채워질 때까지 '가입하기' 비활성화
+// 생년월일 8자리(YYYYMMDD) + 실제 존재하는 날짜인지 검증 (윤년·월별 일수·미래날짜 차단)
+function isBirthValid8(s) {
+  if (!/^\d{8}$/.test(s)) return false;
+  const y = +s.slice(0, 4), m = +s.slice(4, 6), d = +s.slice(6, 8);
+  const now = new Date();
+  const todayNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  if (y < 1900) return false;                 // 너무 과거
+  if (Number(s) > todayNum) return false;     // 미래 날짜 불가
+  if (m < 1 || m > 12) return false;
+  const leap = (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0));
+  const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return d >= 1 && d <= dim[m - 1];
+}
+// 입력 중 8자리인데 존재하지 않는 날짜면 즉시 안내
+function updateBirthHint() {
+  const s = document.getElementById("fBirth").value.trim();
+  const err = document.getElementById("errBirth");
+  if (s.length === 8 && !isBirthValid8(s)) {
+    err.textContent = "존재하지 않는 날짜예요. 생년월일(YYYYMMDD)을 다시 확인해주세요.";
+    err.style.display = "block";
+  } else {
+    err.style.display = "none";
+  }
+}
+
+// 필수 항목(매장·이름·전화·생년월일 8자리 유효날짜·개인정보 동의)이 모두 채워질 때까지 '가입하기' 비활성화
 function updateSubmitState() {
   const name = document.getElementById("fName").value.trim();
   const phone = document.getElementById("fPhone").value.trim();
@@ -284,7 +310,7 @@ function updateSubmitState() {
   const okPrivacy = document.getElementById("cPrivacy").checked;
   const ready = !!store && !!name &&
     /^01[016789]-\d{3,4}-\d{4}$/.test(phone) &&
-    /^\d{6}$/.test(birth) && okPrivacy;
+    isBirthValid8(birth) && okPrivacy;
   document.getElementById("btnSubmit").disabled = !ready;
 }
 // 폼 안의 모든 입력·체크 변화에 반응
@@ -335,7 +361,10 @@ async function submitJoin() {
   showErr("errName", !name); bad = bad || !name;
   const phoneOk = /^01[016789]-\d{3,4}-\d{4}$/.test(phone);
   showErr("errPhone", !phoneOk); bad = bad || !phoneOk;
-  const birthOk = /^\d{6}$/.test(birth);
+  const birthOk = isBirthValid8(birth);
+  if (!birthOk) document.getElementById("errBirth").textContent =
+    (birth.length === 8) ? "존재하지 않는 날짜예요. 생년월일(YYYYMMDD)을 다시 확인해주세요."
+                         : "생년월일 8자리(YYYYMMDD)를 입력해주세요.";
   showErr("errBirth", !birthOk); bad = bad || !birthOk;
   showErr("errConsent", !okPrivacy); bad = bad || !okPrivacy;
   if (!store) { alert("가입 매장을 선택해주세요."); bad = true; }
