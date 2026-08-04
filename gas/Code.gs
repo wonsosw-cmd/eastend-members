@@ -550,3 +550,44 @@ function fixBirthLeadingZeros() {
   SpreadsheetApp.flush();
   Logger.log("birth 보정 완료: " + fixed + "행 변경 / 총 " + out.length + "행");
 }
+
+// 6자리(YYMMDD)가 실제 존재하는 날짜인지 (연도 2자리라 세기 모름 → 2월 29 허용)
+function isValidBirth6_(s) {
+  if (!/^\d{6}$/.test(s)) return false;
+  var mm = +s.slice(2, 4), dd = +s.slice(4, 6);
+  var dim = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= dim[mm - 1];
+}
+
+// 1회 실행용: 기존 6자리 생년월일 중 "유효한 날짜"만 8자리(YYYYMMDD)로 변환.
+//  - 세기 판정은 다운로드(toBirth8)와 동일: 두자리연도 > 올해두자리면 19xx, 아니면 20xx
+//  - 이미 8자리거나, 변환 불가(없는 날짜 등)는 원본 그대로 유지
+function migrateBirthTo8() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MEMBER);
+  var last = sh.getLastRow();
+  if (last < 2) { Logger.log("데이터 없음"); return; }
+  var rng = sh.getRange(2, 7, last - 1, 1); // G열
+  var vals = rng.getValues();
+  var nowYY = new Date().getFullYear() % 100;
+  var out = [], changed = 0, kept8 = 0, keptBad = 0, badList = [];
+  for (var i = 0; i < vals.length; i++) {
+    var s = normBirth6_(String(vals[i][0] == null ? "" : vals[i][0])); // 앞0 복원 포함
+    var result = s;
+    if (s.length === 8) {
+      kept8++;                                    // 이미 8자리 → 유지
+    } else if (s.length === 6 && isValidBirth6_(s)) {
+      var yy = Number(s.slice(0, 2));
+      result = (yy > nowYY ? "19" : "20") + s;    // → 8자리 변환
+      changed++;
+    } else {
+      keptBad++; badList.push(s || "(빈값)");     // 변환 불가 → 원본 유지
+    }
+    out.push([result]);
+  }
+  rng.setNumberFormat("@");
+  SpreadsheetApp.flush();
+  rng.setValues(out);
+  SpreadsheetApp.flush();
+  Logger.log("8자리 변환 " + changed + "명 / 이미8자리 " + kept8 + "명 / 변환불가(원본유지) " + keptBad + "명 / 총 " + out.length + "행");
+  Logger.log("변환불가 값: " + (badList.length ? badList.join(", ") : "없음"));
+}
