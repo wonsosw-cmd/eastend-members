@@ -8,9 +8,12 @@ GitHub Pages(화면) + Google Apps Script(백엔드) + 비공개 구글시트(DB
 
 | 화면 | 주소 | 쓰는 사람 |
 |---|---|---|
-| 크루 앱 | `.../crew/` | 크루 (휴대전화 번호로 로그인) |
-| 카페 승인 | `.../crew/cafe.html` | 제휴 카페 직원 **공통** (카페 접속 코드) |
-| 관리자 | `.../crew/admin.html` | 본사 (관리자 토큰) |
+| 크루 앱 | https://wonsosw-cmd.github.io/eastend-members/crew/ | 크루 (휴대전화 번호로 로그인) |
+| 카페 승인 | https://wonsosw-cmd.github.io/eastend-members/crew/cafe.html | 제휴 카페 직원 **공통** (카페 접속 코드) |
+| 관리자 | https://wonsosw-cmd.github.io/eastend-members/crew/admin.html | 본사 (관리자 토큰) |
+
+백엔드는 구글시트 `크루 카페 사용권 DB` + Apps Script `크루 카페 사용권 API`.
+토큰은 저장소에 두지 않는다 — Apps Script에서 `setup()`을 실행하면 실행 로그에 다시 찍힌다.
 
 ## 사용 흐름
 
@@ -22,7 +25,7 @@ GitHub Pages(화면) + Google Apps Script(백엔드) + 비공개 구글시트(DB
 - 15,000원 초과 → 15,000원까지만 회사 지원, 나머지는 크루가 카페에서 직접 결제
 - 월 한도를 다 쓰면 코드 발급 자체가 막힘 (승인 시점에도 한 번 더 검사)
 
-## 최초 설치
+## 최초 설치 (2026-08-07 완료 — 아래는 재구축용 기록)
 
 1. **구글 시트 생성** — 이름 예: `크루 카페 사용권 DB` (비공개 유지)
 2. 시트에서 **확장 프로그램 > Apps Script** → `gas/crew/Code.gs` 내용을 붙여넣고 저장
