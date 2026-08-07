@@ -346,9 +346,13 @@
     show("loginView");
   }
 
-  // 화면 복귀 시 최신 상태로
+  // 화면 복귀 시 최신 상태로.
+  // 코드 대기 중이면 즉시 1회 확인한다 — 백그라운드 탭은 폴링이 분 단위로 느려지므로
+  // (앱을 껐다 켠 사이에 카페가 승인했으면 돌아오자마자 완료 화면이 떠야 한다)
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden && state.phone && !state.code) refresh();
+    if (document.hidden || !state.phone) return;
+    if (state.code) checkCode();
+    else refresh();
   });
 })();
 </script>

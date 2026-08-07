@@ -228,12 +228,27 @@ function nextCrewId_() {
 // ─────────────────────────────────────────────
 // POST 라우팅
 // ─────────────────────────────────────────────
+// 시트에 쓰는 액션만 스크립트 잠금을 잡는다.
+// (조회·폴링까지 잠그면 크루 화면의 3초 폴링이 승인 처리를 밀어낸다)
+var WRITE_ACTIONS = {
+  issue_code: 1, cancel_code: 1, cafe_redeem: 1,
+  admin_crew_add: 1, admin_crew_update: 1, admin_crew_delete: 1,
+  admin_usage_status: 1, admin_cafe_save: 1, admin_config_save: 1
+};
+
 function doPost(e) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  var lock = null;
   try {
     var p = JSON.parse((e && e.postData && e.postData.contents) || "{}");
     var action = String(p.action || "");
+
+    if (WRITE_ACTIONS[action]) {
+      lock = LockService.getScriptLock();
+      if (!lock.tryLock(25000)) {
+        lock = null;
+        return json_({ result: "error", message: "지금 처리가 몰렸어요. 잠시 후 다시 눌러주세요." });
+      }
+    }
 
     // 크루용
     if (action === "crew_login") return handleCrewLogin_(p);
@@ -257,7 +272,7 @@ function doPost(e) {
   } catch (err) {
     return json_({ result: "error", message: String(err) });
   } finally {
-    lock.releaseLock();
+    if (lock) lock.releaseLock();
   }
 }
 
