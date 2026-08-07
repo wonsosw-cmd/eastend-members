@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#16233f">
+<title>크루 카페 사용권</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .code-box {
+    background: var(--navy); color: #fff; border-radius: 18px;
+    padding: 28px 20px; text-align: center; margin-bottom: 14px;
+  }
+  .code-label { font-size: 12.5px; opacity: .75; font-weight: 600; }
+  .code-digits {
+    font-size: 58px; font-weight: 800; letter-spacing: 14px;
+    margin: 8px 0 2px; padding-left: 14px; font-variant-numeric: tabular-nums;
+  }
+  .code-timer { font-size: 13px; opacity: .8; font-variant-numeric: tabular-nums; }
+  .code-timer strong { color: var(--amber); }
+  .remain-ring {
+    display: flex; align-items: baseline; justify-content: center; gap: 6px;
+    margin: 2px 0 14px;
+  }
+  .remain-num { font-size: 46px; font-weight: 800; letter-spacing: -1.5px; color: var(--navy); }
+  .remain-of { font-size: 16px; color: var(--muted); font-weight: 700; }
+  .dots { display: flex; gap: 7px; justify-content: center; margin-bottom: 4px; }
+  .dot { width: 34px; height: 6px; border-radius: 99px; background: #dfe3ea; }
+  .dot.used { background: var(--teal); }
+  .done-icon { font-size: 44px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">☕</div>
+      <div>
+        <div class="brand-name">크루 카페 사용권</div>
+        <div class="brand-sub" id="brandSub">이스트엔드</div>
+      </div>
+    </div>
+    <button class="btn-ghost btn-sm hidden" id="logoutBtn" type="button">로그아웃</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <!-- 1. 로그인 -->
+  <section id="loginView">
+    <div class="card">
+      <h2 class="card-title">본인 확인</h2>
+      <div class="field">
+        <label for="phone">휴대전화 번호</label>
+        <input id="phone" type="tel" inputmode="numeric" placeholder="010-1234-5678" autocomplete="tel" maxlength="13">
+        <p class="hint">관리자가 등록한 번호로만 이용할 수 있어요.</p>
+      </div>
+      <button class="btn-primary" id="loginBtn" type="button" disabled>시작하기</button>
+    </div>
+  </section>
+
+  <!-- 2. 메인 -->
+  <section id="mainView" class="hidden">
+    <div class="card center">
+      <div style="font-size:15px;font-weight:700" id="crewName"></div>
+      <div class="hint" id="crewDept" style="margin-bottom:14px"></div>
+
+      <div class="card-title" style="margin-bottom:4px" id="monthLabel">이번 달 남은 횟수</div>
+      <div class="remain-ring">
+        <span class="remain-num mono" id="remainNum">-</span>
+        <span class="remain-of mono" id="remainOf"></span>
+      </div>
+      <div class="dots" id="dots"></div>
+      <p class="hint" id="policyNote" style="margin-bottom:18px"></p>
+
+      <button class="btn-teal btn-lg" id="useBtn" type="button">카페 사용하기</button>
+      <p class="hint" id="useNote">버튼을 누르면 4자리 코드가 나와요. 카페 직원에게 보여주세요.</p>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">내 사용 내역</h2>
+      <div id="history"><p class="hint">아직 사용 내역이 없어요.</p></div>
+    </div>
+  </section>
+
+  <!-- 3. 코드 발급 -->
+  <section id="codeView" class="hidden">
+    <div class="code-box">
+      <div class="code-label">카페 직원에게 이 번호를 보여주세요</div>
+      <div class="code-digits mono" id="codeDigits">----</div>
+      <div class="code-timer">남은 시간 <strong id="codeTimer" class="mono">3:00</strong></div>
+    </div>
+    <div class="card">
+      <p class="hint" style="margin:0 0 14px">
+        직원이 코드와 결제 금액을 입력하면 이 화면이 자동으로 바뀌어요.
+        화면을 끄지 말고 잠시 기다려 주세요.
+      </p>
+      <button class="btn-ghost" id="cancelCodeBtn" type="button" style="width:100%">취소하고 돌아가기</button>
+    </div>
+  </section>
+
+  <!-- 4. 사용 완료 -->
+  <section id="doneView" class="hidden">
+    <div class="card center">
+      <div class="done-icon">✅</div>
+      <div style="font-size:19px;font-weight:800;margin:6px 0 2px">사용 완료</div>
+      <div class="hint" id="doneCafe" style="margin-bottom:16px"></div>
+
+      <div class="stat-grid" style="text-align:left">
+        <div class="stat">
+          <div class="stat-label">결제 금액</div>
+          <div class="stat-value mono" id="doneAmount">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">회사 지원</div>
+          <div class="stat-value mono" id="doneCompany" style="color:var(--teal-dark)">-</div>
+        </div>
+      </div>
+      <div class="card" id="doneSelfBox" style="margin:10px 0 0;background:#fdf6ea;border-color:#f3e0c2">
+        <div class="stat-label">본인 부담</div>
+        <div class="stat-value mono" id="doneSelf" style="color:#9c6113">-</div>
+        <p class="hint" style="margin-top:4px">1회 지원 한도를 넘은 금액이에요.</p>
+      </div>
+
+      <button class="btn-primary" id="doneBtn" type="button" style="margin-top:16px">확인</button>
+    </div>
+  </section>
+
+  <footer>이스트엔드 크루 복지 · 문의는 영업마케팅실</footer>
+</div>
+
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+(function () {
+  var A = window.CrewAPI;
+  var $ = function (id) { return document.getElementById(id); };
+  var msg = $("msg");
+
+  var STORE_KEY = "crewCafePhone";
+  var state = { phone: "", data: null, code: "", deadline: 0, timerId: 0, pollId: 0 };
+
+  function show(view) {
+    ["loginView", "mainView", "codeView", "doneView"].forEach(function (v) {
+      $(v).classList.toggle("hidden", v !== view);
+    });
+    $("logoutBtn").classList.toggle("hidden", view === "loginView");
+  }
+
+  // ── 로그인 ─────────────────────────────
+  $("phone").addEventListener("input", function (e) {
+    e.target.value = A.normPhone(e.target.value);
+    $("loginBtn").disabled = !/^01[016789]-\d{3,4}-\d{4}$/.test(e.target.value);
+  });
+  $("phone").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !$("loginBtn").disabled) $("loginBtn").click();
+  });
+
+  $("loginBtn").addEventListener("click", async function () {
+    var btn = $("loginBtn");
+    btn.disabled = true; btn.textContent = "확인 중...";
+    A.clearMsg(msg);
+    try {
+      var r = await A.post({ action: "crew_login", phone: $("phone").value });
+      if (r.result !== "ok") { A.showMsg(msg, r.message); return; }
+      state.phone = r.crew.phone;
+      localStorage.setItem(STORE_KEY, state.phone);
+      applyState(r);
+    } catch (err) {
+      A.showMsg(msg, "연결에 실패했어요: " + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = "시작하기";
+    }
+  });
+
+  $("logoutBtn").addEventListener("click", function () {
+    localStorage.removeItem(STORE_KEY);
+    stopTimers();
+    state = { phone: "", data: null, code: "", deadline: 0, timerId: 0, pollId: 0 };
+    $("phone").value = "";
+    $("loginBtn").disabled = true;
+    A.clearMsg(msg);
+    show("loginView");
+  });
+
+  // ── 메인 상태 반영 ──────────────────────
+  function applyState(r) {
+    state.data = r;
+    $("crewName").textContent = r.crew.name + " 크루";
+    $("crewDept").textContent = r.crew.dept || "";
+
+    var limit = r.policy.monthlyLimit, used = r.month.used;
+    $("monthLabel").textContent = Number(r.month.ym.slice(5)) + "월 남은 횟수";
+    $("remainNum").textContent = r.month.remain;
+    $("remainOf").textContent = "/ " + limit + "회";
+
+    var dots = "";
+    for (var i = 0; i < limit; i++) dots += '<div class="dot' + (i < used ? " used" : "") + '"></div>';
+    $("dots").innerHTML = dots;
+
+    $("policyNote").textContent =
+      "1회 " + A.won(r.policy.voucherAmount) + " 지원 · 이번 달 " + used + "회 사용 (회사 지원 " + A.won(r.month.companyAmount) + ")";
+
+    var canUse = r.month.remain > 0;
+    $("useBtn").disabled = !canUse;
+    $("useBtn").textContent = canUse ? "카페 사용하기" : "이번 달 사용 완료";
+    $("useNote").textContent = canUse
+      ? "버튼을 누르면 4자리 코드가 나와요. 카페 직원에게 보여주세요."
+      : "다음 달 1일에 다시 " + limit + "회가 충전돼요.";
+
+    renderHistory(r.history);
+
+    // 발급 대기 중인 코드가 있으면 코드 화면으로
+    if (r.pending && r.pending.code) {
+      startCode(r.pending.code, 170);
+    } else {
+      show("mainView");
+    }
+  }
+
+  function renderHistory(list) {
+    if (!list || !list.length) {
+      $("history").innerHTML = '<p class="hint">아직 사용 내역이 없어요.</p>';
+      return;
+    }
+    $("history").innerHTML = list.map(function (h) {
+      var self = h.self > 0 ? ' · 본인 ' + A.won(h.self) : "";
+      return '<div class="list-item">' +
+        '<div><div class="list-main">' + escapeHtml(h.cafe) + '</div>' +
+        '<div class="list-sub">' + A.fmtDateTime(h.usedAt) + '</div></div>' +
+        '<div class="right"><div class="list-main mono">' + A.won(h.amount) + '</div>' +
+        '<div class="list-sub mono">회사 ' + A.won(h.company) + self + '</div></div></div>';
+    }).join("");
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // ── 코드 발급 ───────────────────────────
+  $("useBtn").addEventListener("click", async function () {
+    var btn = $("useBtn");
+    btn.disabled = true; btn.textContent = "발급 중...";
+    A.clearMsg(msg);
+    try {
+      var r = await A.post({ action: "issue_code", phone: state.phone });
+      if (r.result !== "ok") { A.showMsg(msg, r.message); return; }
+      startCode(r.code, 180);
+    } catch (err) {
+      A.showMsg(msg, "연결에 실패했어요: " + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = "카페 사용하기";
+    }
+  });
+
+  function startCode(code, seconds) {
+    state.code = code;
+    state.deadline = Date.now() + seconds * 1000;
+    $("codeDigits").textContent = code;
+    show("codeView");
+    stopTimers();
+
+    state.timerId = setInterval(function () {
+      var left = Math.max(0, Math.round((state.deadline - Date.now()) / 1000));
+      $("codeTimer").textContent = Math.floor(left / 60) + ":" + ("0" + (left % 60)).slice(-2);
+      if (left <= 0) {
+        stopTimers();
+        A.showMsg(msg, "코드 시간이 지났어요. 다시 발급해 주세요.");
+        refresh();
+      }
+    }, 500);
+
+    state.pollId = setInterval(checkCode, 3000);
+    checkCode();
+  }
+
+  function stopTimers() {
+    if (state.timerId) clearInterval(state.timerId);
+    if (state.pollId) clearInterval(state.pollId);
+    state.timerId = 0; state.pollId = 0;
+  }
+
+  async function checkCode() {
+    if (!state.code) return;
+    try {
+      var r = await A.post({ action: "check_code", code: state.code });
+      if (r.result !== "ok") return;
+      if (r.status === "used") {
+        stopTimers();
+        showDone(r.detail);
+      } else if (r.status === "expired") {
+        stopTimers();
+        A.showMsg(msg, "코드 시간이 지났어요. 다시 발급해 주세요.");
+        refresh();
+      }
+    } catch (e) { /* 네트워크 일시 오류는 다음 폴링에서 회복 */ }
+  }
+
+  $("cancelCodeBtn").addEventListener("click", async function () {
+    stopTimers();
+    try { await A.post({ action: "cancel_code", code: state.code }); } catch (e) {}
+    state.code = "";
+    refresh();
+  });
+
+  // ── 완료 화면 ───────────────────────────
+  function showDone(d) {
+    $("doneCafe").textContent = d.cafe + " · " + A.fmtDateTime(d.usedAt);
+    $("doneAmount").textContent = A.won(d.amount);
+    $("doneCompany").textContent = A.won(d.company);
+    $("doneSelf").textContent = A.won(d.self);
+    $("doneSelfBox").classList.toggle("hidden", !(d.self > 0));
+    state.code = "";
+    show("doneView");
+  }
+
+  $("doneBtn").addEventListener("click", refresh);
+
+  // ── 새로고침 ────────────────────────────
+  async function refresh() {
+    if (!state.phone) { show("loginView"); return; }
+    try {
+      var r = await A.post({ action: "crew_login", phone: state.phone });
+      if (r.result !== "ok") {
+        A.showMsg(msg, r.message);
+        localStorage.removeItem(STORE_KEY);
+        show("loginView");
+        return;
+      }
+      applyState(r);
+    } catch (err) {
+      A.showMsg(msg, "연결에 실패했어요: " + err.message);
+    }
+  }
+
+  // ── 시작 ────────────────────────────────
+  var saved = localStorage.getItem(STORE_KEY);
+  if (saved) {
+    state.phone = saved;
+    $("phone").value = saved;
+    refresh();
+  } else {
+    show("loginView");
+  }
+
+  // 화면 복귀 시 최신 상태로
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && state.phone && !state.code) refresh();
+  });
+})();
+</script>
+</body>
+</html>

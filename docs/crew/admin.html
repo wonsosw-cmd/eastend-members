@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#16233f">
+<title>크루 카페 사용권 · 관리자</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab {
+    background: #fff; border: 1px solid var(--line); color: var(--muted);
+    border-radius: 10px; padding: 9px 15px; font-size: 13.5px; font-weight: 700; cursor: pointer;
+  }
+  .tab.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .toolbar input, .toolbar select { width: auto; min-width: 130px; font-size: 14px; padding: 9px 11px; }
+  .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .matrix td.cell { text-align: center; font-variant-numeric: tabular-nums; }
+  .cell-0 { color: #c8ccd4; }
+  .cell-full { background: #e8f5f3; color: var(--teal-dark); font-weight: 700; }
+  .cell-over { background: #fdeeed; color: #a8352d; font-weight: 700; }
+  .row-cancel td { color: #b9bec7; text-decoration: line-through; }
+  .link { color: var(--teal-dark); cursor: pointer; text-decoration: underline; font-size: 12.5px; }
+  .cafe-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .cafe-row input { flex: 1; }
+  .cafe-row select { width: 100px; }
+  .token-box {
+    background: #f7f8fa; border: 1px dashed var(--line); border-radius: 10px;
+    padding: 12px 14px; font-size: 13px; word-break: break-all;
+  }
+</style>
+</head>
+<body>
+<div class="wrap-wide">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">☕</div>
+      <div>
+        <div class="brand-name">크루 카페 사용권 · 관리자</div>
+        <div class="brand-sub" id="brandSub">이스트엔드</div>
+      </div>
+    </div>
+    <button class="btn-ghost btn-sm hidden" id="reloadBtn" type="button">새로고침</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <!-- 로그인 -->
+  <section id="loginView">
+    <div class="card" style="max-width:420px">
+      <h2 class="card-title">관리자 로그인</h2>
+      <div class="field">
+        <label for="token">관리자 토큰</label>
+        <input id="token" type="password" placeholder="Apps Script setup() 로그의 토큰" autocomplete="off">
+      </div>
+      <button class="btn-primary" id="loginBtn" type="button">로그인</button>
+    </div>
+  </section>
+
+  <!-- 본문 -->
+  <section id="mainView" class="hidden">
+
+    <div class="stat-grid" style="margin-bottom:14px">
+      <div class="stat"><div class="stat-label">활성 크루</div><div class="stat-value mono" id="sCrew">-</div></div>
+      <div class="stat"><div class="stat-label" id="sVisitLabel">이번 달 방문</div><div class="stat-value mono" id="sVisit">-</div></div>
+      <div class="stat"><div class="stat-label">이번 달 회사 지원</div><div class="stat-value mono" id="sCompany">-</div></div>
+      <div class="stat"><div class="stat-label">이번 달 총 결제</div><div class="stat-value mono" id="sAmount">-</div></div>
+      <div class="stat"><div class="stat-label">이번 달 미사용 크루</div><div class="stat-value mono" id="sIdle">-</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab on" data-tab="crews" type="button">크루 관리</button>
+      <button class="tab" data-tab="usage" type="button">사용 내역</button>
+      <button class="tab" data-tab="matrix" type="button">월별 집계</button>
+      <button class="tab" data-tab="config" type="button">설정</button>
+    </div>
+
+    <!-- 크루 관리 -->
+    <div id="tab-crews">
+      <div class="card">
+        <h2 class="card-title">크루 추가</h2>
+        <div class="grid-form">
+          <div><label for="nName">이름</label><input id="nName" type="text" maxlength="20" placeholder="홍길동"></div>
+          <div><label for="nPhone">휴대전화</label><input id="nPhone" type="tel" inputmode="numeric" maxlength="13" placeholder="010-1234-5678"></div>
+          <div><label for="nDept">소속</label><input id="nDept" type="text" maxlength="30" placeholder="영업마케팅실"></div>
+          <div><label for="nLimit">월 한도</label><input id="nLimit" type="number" min="0" max="31" placeholder="기본값 사용"></div>
+          <div><button class="btn-primary" id="addBtn" type="button">추가</button></div>
+        </div>
+        <p class="hint">월 한도를 비워두면 전체 기본값(설정 탭)을 따릅니다. 크루는 이 휴대전화 번호로 앱에 로그인해요.</p>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <input id="crewSearch" type="search" placeholder="이름·소속·번호 검색">
+          <select id="crewFilter">
+            <option value="">전체</option>
+            <option value="활성">활성만</option>
+            <option value="비활성">비활성만</option>
+          </select>
+          <button class="btn-ghost btn-sm" id="crewCsv" type="button">크루 CSV</button>
+        </div>
+        <div class="table-scroll">
+          <table id="crewTable">
+            <thead><tr>
+              <th>ID</th><th>이름</th><th>휴대전화</th><th>소속</th>
+              <th class="num" id="thThisMonth">이번 달</th><th class="num">지원액</th>
+              <th>상태</th><th>월 한도</th><th>관리</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 사용 내역 -->
+    <div id="tab-usage" class="hidden">
+      <div class="card">
+        <div class="toolbar">
+          <select id="uMonth"></select>
+          <input id="uSearch" type="search" placeholder="이름·카페 검색">
+          <select id="uCafe"><option value="">전체 카페</option></select>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;margin:0">
+            <input type="checkbox" id="uShowCancel" style="width:auto"> 취소 건 포함
+          </label>
+          <button class="btn-ghost btn-sm" id="usageCsv" type="button">내역 CSV</button>
+        </div>
+        <div id="uSummary" class="hint" style="margin-bottom:10px"></div>
+        <div class="table-scroll">
+          <table id="usageTable">
+            <thead><tr>
+              <th>승인일시</th><th>이름</th><th>소속</th><th>카페</th>
+              <th class="num">결제금액</th><th class="num">회사 지원</th><th class="num">본인 부담</th>
+              <th>승인자</th><th>상태</th><th>관리</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 월별 집계 -->
+    <div id="tab-matrix" class="hidden">
+      <div class="card">
+        <div class="toolbar">
+          <select id="mMode">
+            <option value="count">방문 횟수</option>
+            <option value="company">회사 지원액</option>
+            <option value="amount">총 결제액</option>
+          </select>
+          <select id="mYear"></select>
+          <button class="btn-ghost btn-sm" id="matrixCsv" type="button">집계 CSV</button>
+        </div>
+        <p class="hint" style="margin-top:0">누가 몇 월에 몇 번 방문했는지 한눈에 볼 수 있어요. 한도를 다 쓴 달은 초록색, 한도를 넘긴 달은 빨간색입니다.</p>
+        <div class="table-scroll">
+          <table id="matrixTable" class="matrix"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 설정 -->
+    <div id="tab-config" class="hidden">
+      <div class="card" style="max-width:560px">
+        <h2 class="card-title">지원 정책</h2>
+        <div class="grid-form">
+          <div><label for="cLimit">1인당 월 최대 방문</label><input id="cLimit" type="number" min="0" max="31"></div>
+          <div><label for="cAmount">1회당 회사 지원 한도(원)</label><input id="cAmount" type="number" min="0" step="1000"></div>
+          <div><button class="btn-primary" id="saveConfig" type="button">저장</button></div>
+        </div>
+        <p class="hint">개별 크루의 월 한도를 다르게 주려면 크루 관리 탭에서 해당 크루의 월 한도를 지정하세요.</p>
+      </div>
+
+      <div class="card" style="max-width:560px">
+        <h2 class="card-title">제휴 카페</h2>
+        <div id="cafeRows"></div>
+        <button class="btn-ghost btn-sm" id="addCafe" type="button">+ 카페 추가</button>
+        <button class="btn-primary btn-sm" id="saveCafe" type="button" style="width:auto;margin-left:6px">저장</button>
+        <p class="hint">카페 화면에서 선택할 수 있는 목록이에요. 비활성으로 두면 새 승인은 막히고 기존 기록은 남습니다.</p>
+      </div>
+
+      <div class="card" style="max-width:560px">
+        <h2 class="card-title">공유 링크</h2>
+        <p class="hint" style="margin-top:0">크루용 (사내 공지·카톡으로 배포)</p>
+        <div class="token-box" id="linkCrew">-</div>
+        <p class="hint">카페 공통 승인용 (카페에 전달 · 접속 코드 필요)</p>
+        <div class="token-box" id="linkCafe">-</div>
+        <p class="hint">카페 접속 코드</p>
+        <div class="token-box"><strong id="cafeToken">-</strong> — 카페 기기에 한 번만 입력하면 계속 유지돼요.</div>
+      </div>
+    </div>
+
+  </section>
+
+  <footer>이스트엔드 크루 복지 · 관리자 전용</footer>
+</div>
+
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+(function () {
+  var A = window.CrewAPI;
+  var $ = function (id) { return document.getElementById(id); };
+  var msg = $("msg");
+  var K_TOKEN = "crewAdminToken";
+  var D = { crews: [], usage: [], cafes: [], config: {}, thisYm: "", months: [], cafeToken: "" };
+  var token = "";
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function won(n) { return (Number(n) || 0).toLocaleString("ko-KR"); }
+  function limitOf(c) { return (c.limit == null || c.limit === "") ? (D.config.monthlyLimit || 0) : c.limit; }
+
+  // ── 로그인 ─────────────────────────────
+  $("loginBtn").addEventListener("click", function () { doLogin($("token").value.trim()); });
+  $("token").addEventListener("keydown", function (e) { if (e.key === "Enter") $("loginBtn").click(); });
+  $("reloadBtn").addEventListener("click", function () { load(); });
+
+  async function doLogin(t) {
+    if (!t) { A.showMsg(msg, "토큰을 입력해 주세요"); return; }
+    token = t;
+    var ok = await load(true);
+    if (ok) {
+      localStorage.setItem(K_TOKEN, t);
+      $("loginView").classList.add("hidden");
+      $("mainView").classList.remove("hidden");
+      $("reloadBtn").classList.remove("hidden");
+    }
+  }
+
+  async function load(quiet) {
+    try {
+      var r = await A.get({ action: "admin_init", token: token });
+      if (r.result !== "ok") {
+        A.showMsg(msg, r.message === "unauthorized" ? "토큰이 올바르지 않아요" : r.message);
+        return false;
+      }
+      D = r;
+      renderAll();
+      if (!quiet) A.showMsg(msg, "최신 데이터로 갱신했어요", "ok");
+      setTimeout(function () { A.clearMsg(msg); }, 2000);
+      return true;
+    } catch (err) {
+      A.showMsg(msg, "연결에 실패했어요: " + err.message);
+      return false;
+    }
+  }
+
+  function renderAll() {
+    renderStats();
+    renderCrews();
+    renderUsageFilters();
+    renderUsage();
+    renderMatrixControls();
+    renderMatrix();
+    renderConfig();
+  }
+
+  // ── 요약 ───────────────────────────────
+  function renderStats() {
+    var active = D.crews.filter(function (c) { return c.status === "활성"; });
+    var thisMonth = D.usage.filter(function (u) { return u.ym === D.thisYm && u.status === "정상"; });
+    $("sCrew").textContent = active.length + "명";
+    $("sVisitLabel").textContent = Number(D.thisYm.slice(5)) + "월 방문";
+    $("sVisit").textContent = thisMonth.length + "회";
+    $("sCompany").textContent = won(thisMonth.reduce(function (s, u) { return s + u.company; }, 0));
+    $("sAmount").textContent = won(thisMonth.reduce(function (s, u) { return s + u.amount; }, 0));
+    var usedIds = {};
+    thisMonth.forEach(function (u) { usedIds[u.crewId] = true; });
+    $("sIdle").textContent = active.filter(function (c) { return !usedIds[c.crewId]; }).length + "명";
+  }
+
+  // ── 탭 ─────────────────────────────────
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (b) {
+    b.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (x) { x.classList.remove("on"); });
+      b.classList.add("on");
+      ["crews", "usage", "matrix", "config"].forEach(function (t) {
+        $("tab-" + t).classList.toggle("hidden", t !== b.dataset.tab);
+      });
+    });
+  });
+
+  // ── 크루 관리 ───────────────────────────
+  $("nPhone").addEventListener("input", function (e) { e.target.value = A.normPhone(e.target.value); });
+
+  $("addBtn").addEventListener("click", async function () {
+    var btn = $("addBtn");
+    btn.disabled = true;
+    try {
+      var r = await A.post({
+        action: "admin_crew_add", token: token,
+        name: $("nName").value, phone: $("nPhone").value,
+        dept: $("nDept").value, limit: $("nLimit").value
+      });
+      if (r.result !== "ok") { A.showMsg(msg, r.message); return; }
+      $("nName").value = ""; $("nPhone").value = ""; $("nDept").value = ""; $("nLimit").value = "";
+      A.showMsg(msg, "추가했어요 (" + r.crewId + ")", "ok");
+      await load(true);
+    } finally { btn.disabled = false; }
+  });
+
+  $("crewSearch").addEventListener("input", renderCrews);
+  $("crewFilter").addEventListener("change", renderCrews);
+
+  function filteredCrews() {
+    var q = $("crewSearch").value.trim().toLowerCase();
+    var f = $("crewFilter").value;
+    return D.crews.filter(function (c) {
+      if (f && c.status !== f) return false;
+      if (!q) return true;
+      return (c.name + " " + c.dept + " " + c.phone + " " + c.crewId).toLowerCase().indexOf(q) >= 0;
+    });
+  }
+
+  function renderCrews() {
+    $("thThisMonth").textContent = Number(D.thisYm.slice(5)) + "월";
+    var rows = filteredCrews();
+    var html = rows.map(function (c) {
+      var lim = limitOf(c);
+      var cls = c.thisMonthCount >= lim && lim > 0 ? "cell-full" : "";
+      return '<tr data-id="' + c.crewId + '">' +
+        "<td>" + esc(c.crewId) + "</td>" +
+        "<td><strong>" + esc(c.name) + "</strong></td>" +
+        "<td class='mono'>" + esc(c.phone) + "</td>" +
+        "<td>" + esc(c.dept) + "</td>" +
+        '<td class="num ' + cls + '">' + c.thisMonthCount + " / " + lim + "</td>" +
+        '<td class="num">' + won(c.thisMonthCompany) + "</td>" +
+        "<td><span class='pill " + (c.status === "활성" ? "pill-on" : "pill-off") + "'>" + esc(c.status) + "</span></td>" +
+        "<td>" + (c.limit == null || c.limit === "" ? '<span class="muted">기본</span>' : c.limit) + "</td>" +
+        "<td>" +
+          '<span class="link" data-act="toggle">' + (c.status === "활성" ? "중지" : "활성화") + "</span> · " +
+          '<span class="link" data-act="edit">수정</span> · ' +
+          '<span class="link" data-act="del">삭제</span>' +
+        "</td></tr>";
+    }).join("");
+    $("crewTable").querySelector("tbody").innerHTML = html ||
+      '<tr><td colspan="9" class="center muted" style="padding:24px">등록된 크루가 없어요.</td></tr>';
+
+    Array.prototype.forEach.call($("crewTable").querySelectorAll(".link"), function (el) {
+      el.addEventListener("click", function () {
+        var id = el.closest("tr").dataset.id;
+        var c = D.crews.filter(function (x) { return x.crewId === id; })[0];
+        if (!c) return;
+        if (el.dataset.act === "toggle") toggleCrew(c);
+        if (el.dataset.act === "edit") editCrew(c);
+        if (el.dataset.act === "del") delCrew(c);
+      });
+    });
+  }
+
+  async function toggleCrew(c) {
+    var next = c.status === "활성" ? "비활성" : "활성";
+    var r = await A.post({ action: "admin_crew_update", token: token, crewId: c.crewId, status: next });
+    if (r.result !== "ok") { A.showMsg(msg, r.message); return; }
+    await load(true);
+  }
+
+  async function editCrew(c) {
+    var name = prompt("이름", c.name); if (name === null) return;
+    var phone = prompt("휴대전화", c.phone); if (phone === null) return;
+    var dept = prompt("소속", c.dept); if (dept === null) return;
+    var lim = prompt("월 한도 (비우면 기본값 " + (D.config.monthlyLimit || 0) + "회)", c.limit == null ? "" : c.limit);
+    if (lim === null) return;
+    var r = await A.post({
+      action: "admin_crew_update", token: token, crewId: c.crewId,
+      name: name, phone: phone, dept: dept, limit: lim.trim()
+    });
+    if (r.result !== "ok") { A.showMsg(msg, r.message); return; }
+    A.showMsg(msg, "수정했어요", "ok");
+    await load(true);
+  }
+
+  async function delCrew(c) {
+    if (!confirm(c.name + " 크루를 명단에서 삭제할까요?\n(지난 사용 내역은 그대로 남습니다. 잠시 막을 거면 '중지'를 쓰세요.)")) return;
+    var r = await A.post({ action: "admin_crew_delete", token: token, crewId: c.crewId });
+    if (r.result !== "ok") { A.showMsg(msg, r.message); return; }
+    await load(true);
+  }
+
+  $("crewCsv").addEventListener("click", function () {
+    var head = ["크루ID", "이름", "휴대전화", "소속", "상태", "월한도", D.thisYm + " 방문", D.thisYm + " 회사지원"];
+    var rows = filteredCrews().map(function (c) {
+      return [c.crewId, c.name, c.phone, c.dept, c.status, limitOf(c), c.thisMonthCount, c.thisMonthCompany];
+    });
+    downloadCsv("크루명단_" + D.thisYm + ".csv", head, rows);
+  });
+
+  // ── 사용 내역 ───────────────────────────
+  function renderUsageFilters() {
+    var m = $("uMonth"), keep = m.value;
+    m.innerHTML = '<option value="">전체 기간</option>' + D.months.map(function (y) {
+      return '<option value="' + y + '">' + y.replace("-", "년 ") + "월</option>";
+    }).join("");
+    m.value = keep || D.thisYm;
+
+    var cafes = {};
+    D.usage.forEach(function (u) { if (u.cafe) cafes[u.cafe] = true; });
+    var cs = $("uCafe"), keepC = cs.value;
+    cs.innerHTML = '<option value="">전체 카페</option>' + Object.keys(cafes).sort().map(function (c) {
+      return '<option value="' + esc(c) + '">' + esc(c) + "</option>";
+    }).join("");
+    cs.value = keepC;
+  }
+
+  ["uMonth", "uSearch", "uCafe", "uShowCancel"].forEach(function (id) {
+    $(id).addEventListener("input", renderUsage);
+    $(id).addEventListener("change", renderUsage);
+  });
+
+  function filteredUsage() {
+    var ym = $("uMonth").value, q = $("uSearch").value.trim().toLowerCase();
+    var cafe = $("uCafe").value, showCancel = $("uShowCancel").checked;
+    return D.usage.filter(function (u) {
+      if (ym && u.ym !== ym) return false;
+      if (cafe && u.cafe !== cafe) return false;
+      if (!showCancel && u.status !== "정상") return false;
+      if (q && (u.name + " " + u.dept + " " + u.cafe + " " + u.staff).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+
+  function renderUsage() {
+    var rows = filteredUsage();
+    var ok = rows.filter(function (u) { return u.status === "정상"; });
+    $("uSummary").innerHTML = "총 <strong>" + ok.length + "회</strong> · 회사 지원 <strong>" +
+      won(ok.reduce(function (s, u) { return s + u.company; }, 0)) + "원</strong> · 총 결제 " +
+      won(ok.reduce(function (s, u) { return s + u.amount; }, 0)) + "원 · 이용 크루 " +
+      Object.keys(ok.reduce(function (a, u) { a[u.crewId] = 1; return a; }, {})).length + "명";
+
+    $("usageTable").querySelector("tbody").innerHTML = rows.map(function (u) {
+      return '<tr data-id="' + u.usageId + '" class="' + (u.status === "정상" ? "" : "row-cancel") + '">' +
+        "<td class='mono'>" + A.fmtDateTime(u.usedAt) + "</td>" +
+        "<td><strong>" + esc(u.name) + "</strong></td>" +
+        "<td>" + esc(u.dept) + "</td>" +
+        "<td>" + esc(u.cafe) + "</td>" +
+        '<td class="num">' + won(u.amount) + "</td>" +
+        '<td class="num">' + won(u.company) + "</td>" +
+        '<td class="num">' + (u.self > 0 ? won(u.self) : '<span class="muted">-</span>') + "</td>" +
+        "<td>" + esc(u.staff) + "</td>" +
+        "<td><span class='pill " + (u.status === "정상" ? "pill-on" : "pill-cancel") + "'>" + esc(u.status) + "</span></td>" +
+        '<td><span class="link" data-act="status">' + (u.status === "정상" ? "취소" : "복구") + "</span></td>" +
+        "</tr>";
+    }).join("") || '<tr><td colspan="10" class="center muted" style="padding:24px">해당 조건의 사용 내역이 없어요.</td></tr>';
+
+    Array.prototype.forEach.call($("usageTable").querySelectorAll('.link[data-act="status"]'), function (el) {
+      el.addEventListener("click", async function () {
+        var id = el.closest("tr").dataset.id;
+        var u = D.usage.filter(function (x) { return x.usageId === id; })[0];
+        if (!u) return;
+        var next = u.status === "정상" ? "취소" : "정상";
+        if (next === "취소" && !confirm(u.name + " 크루의 " + A.fmtDateTime(u.usedAt) + " 건을 취소 처리할까요?\n(월 사용 횟수에서 빠집니다)")) return;
+        var r = await A.post({ action: "admin_usage_status", token: token, usageId: id, status: next });
+        if (r.result !== "ok") { A.showMsg(msg, r.message); return; }
+        await load(true);
+      });
+    });
+  }
+
+  $("usageCsv").addEventListener("click", function () {
+    var head = ["승인일시", "크루ID", "이름", "소속", "카페", "결제금액", "회사지원", "본인부담", "승인자", "년월", "상태"];
+    var rows = filteredUsage().map(function (u) {
+      return [u.usedAt.replace("T", " "), u.crewId, u.name, u.dept, u.cafe, u.amount, u.company, u.self, u.staff, u.ym, u.status];
+    });
+    downloadCsv("카페사용내역_" + ($("uMonth").value || "전체") + ".csv", head, rows);
+  });
+
+  // ── 월별 집계 매트릭스 ──────────────────
+  function renderMatrixControls() {
+    var years = {};
+    D.months.forEach(function (m) { years[m.slice(0, 4)] = true; });
+    years[D.thisYm.slice(0, 4)] = true;
+    var sel = $("mYear"), keep = sel.value;
+    sel.innerHTML = Object.keys(years).sort().reverse().map(function (y) {
+      return '<option value="' + y + '">' + y + "년</option>";
+    }).join("");
+    sel.value = keep || D.thisYm.slice(0, 4);
+  }
+  $("mMode").addEventListener("change", renderMatrix);
+  $("mYear").addEventListener("change", renderMatrix);
+
+  function matrixData() {
+    var year = $("mYear").value, mode = $("mMode").value;
+    var months = [];
+    for (var i = 1; i <= 12; i++) months.push(year + "-" + ("0" + i).slice(-2));
+
+    var map = {};
+    D.usage.forEach(function (u) {
+      if (u.status !== "정상" || u.ym.slice(0, 4) !== year) return;
+      if (!map[u.crewId]) map[u.crewId] = {};
+      if (!map[u.crewId][u.ym]) map[u.crewId][u.ym] = { count: 0, company: 0, amount: 0 };
+      map[u.crewId][u.ym].count++;
+      map[u.crewId][u.ym].company += u.company;
+      map[u.crewId][u.ym].amount += u.amount;
+    });
+
+    // 사용 이력이 있는 크루는 명단에서 지워졌어도 표시
+    var known = {};
+    D.crews.forEach(function (c) { known[c.crewId] = { crewId: c.crewId, name: c.name, dept: c.dept, limit: limitOf(c), status: c.status }; });
+    Object.keys(map).forEach(function (id) {
+      if (!known[id]) {
+        var any = D.usage.filter(function (u) { return u.crewId === id; })[0] || {};
+        known[id] = { crewId: id, name: (any.name || id) + " (삭제됨)", dept: any.dept || "", limit: D.config.monthlyLimit || 0, status: "삭제" };
+      }
+    });
+
+    var crews = Object.keys(known).map(function (id) { return known[id]; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name, "ko"); });
+
+    return { year: year, mode: mode, months: months, map: map, crews: crews };
+  }
+
+  function renderMatrix() {
+    var m = matrixData();
+    var fmt = function (cell) {
+      if (!cell) return 0;
+      return m.mode === "count" ? cell.count : (m.mode === "company" ? cell.company : cell.amount);
+    };
+
+    $("matrixTable").querySelector("thead").innerHTML =
+      "<tr><th>이름</th><th>소속</th>" +
+      m.months.map(function (x) { return '<th class="num">' + Number(x.slice(5)) + "월</th>"; }).join("") +
+      '<th class="num">합계</th></tr>';
+
+    var body = m.crews.map(function (c) {
+      var total = 0;
+      var tds = m.months.map(function (ym) {
+        var cell = (m.map[c.crewId] || {})[ym];
+        var v = fmt(cell);
+        total += v;
+        var cls = "cell";
+        if (!v) cls += " cell-0";
+        else if (m.mode === "count" && c.limit > 0) {
+          if (v > c.limit) cls += " cell-over";
+          else if (v === c.limit) cls += " cell-full";
+        }
+        return '<td class="' + cls + '">' + (v ? (m.mode === "count" ? v : won(v)) : "·") + "</td>";
+      }).join("");
+      return "<tr><td><strong>" + esc(c.name) + "</strong>" +
+        (c.status === "비활성" ? ' <span class="pill pill-off">중지</span>' : "") +
+        "</td><td>" + esc(c.dept) + "</td>" + tds +
+        '<td class="num"><strong>' + (m.mode === "count" ? total : won(total)) + "</strong></td></tr>";
+    }).join("");
+
+    $("matrixTable").querySelector("tbody").innerHTML = body ||
+      '<tr><td colspan="15" class="center muted" style="padding:24px">' + m.year + "년 데이터가 없어요.</td></tr>";
+
+    var sums = m.months.map(function (ym) {
+      return m.crews.reduce(function (s, c) { return s + fmt((m.map[c.crewId] || {})[ym]); }, 0);
+    });
+    var grand = sums.reduce(function (s, v) { return s + v; }, 0);
+    $("matrixTable").querySelector("tfoot").innerHTML =
+      '<tr><th colspan="2">합계</th>' +
+      sums.map(function (v) { return '<th class="num">' + (v ? (m.mode === "count" ? v : won(v)) : "·") + "</th>"; }).join("") +
+      '<th class="num">' + (m.mode === "count" ? grand : won(grand)) + "</th></tr>";
+  }
+
+  $("matrixCsv").addEventListener("click", function () {
+    var m = matrixData();
+    var head = ["이름", "소속"].concat(m.months.map(function (x) { return Number(x.slice(5)) + "월"; })).concat(["합계"]);
+    var rows = m.crews.map(function (c) {
+      var total = 0;
+      var cells = m.months.map(function (ym) {
+        var cell = (m.map[c.crewId] || {})[ym];
+        var v = !cell ? 0 : (m.mode === "count" ? cell.count : (m.mode === "company" ? cell.company : cell.amount));
+        total += v; return v;
+      });
+      return [c.name, c.dept].concat(cells).concat([total]);
+    });
+    downloadCsv("카페사용_월별집계_" + m.year + "_" + $("mMode").selectedOptions[0].textContent + ".csv", head, rows);
+  });
+
+  // ── 설정 ───────────────────────────────
+  function renderConfig() {
+    $("cLimit").value = D.config.monthlyLimit;
+    $("cAmount").value = D.config.voucherAmount;
+    D.cafes = D.cafes || [];
+    renderCafeRows();
+    var base = location.href.replace(/admin\.html.*$/, "");
+    $("linkCrew").textContent = base;
+    $("linkCafe").textContent = base + "cafe.html";
+    $("cafeToken").textContent = D.cafeToken || "-";
+  }
+
+  function renderCafeRows() {
+    $("cafeRows").innerHTML = D.cafes.map(function (c, i) {
+      return '<div class="cafe-row"><input type="text" value="' + esc(c.name) + '" data-i="' + i + '" data-k="name" maxlength="40">' +
+        '<select data-i="' + i + '" data-k="status">' +
+        '<option value="활성"' + (c.status !== "비활성" ? " selected" : "") + ">활성</option>" +
+        '<option value="비활성"' + (c.status === "비활성" ? " selected" : "") + ">비활성</option></select>" +
+        '<button class="btn-danger btn-sm" data-i="' + i + '" data-k="del" type="button">삭제</button></div>';
+    }).join("") || '<p class="hint">등록된 카페가 없어요. 아래에서 추가해 주세요.</p>';
+
+    Array.prototype.forEach.call($("cafeRows").querySelectorAll("[data-k]"), function (el) {
+      var i = Number(el.dataset.i), k = el.dataset.k;
+      if (k === "del") {
+        el.addEventListener("click", function () { D.cafes.splice(i, 1); renderCafeRows(); });
+      } else {
+        el.addEventListener("input", function () { D.cafes[i][k] = el.value; });
+        el.addEventListener("change", function () { D.cafes[i][k] = el.value; });
+      }
+    });
+  }
+
+  $("addCafe").addEventListener("click", function () {
+    D.cafes.push({ name: "", status: "활성", memo: "" });
+    renderCafeRows();
+  });
+
+  $("saveCafe").addEventListener("click", async function () {
+    var r = await A.post({ action: "admin_cafe_save", token: token, cafes: D.cafes });
+    if (r.result !== "ok") { A.showMsg(msg, r.message); return; }
+    A.showMsg(msg, "카페 목록을 저장했어요", "ok");
+    await load(true);
+  });
+
+  $("saveConfig").addEventListener("click", async function () {
+    var r = await A.post({
+      action: "admin_config_save", token: token,
+      monthlyLimit: $("cLimit").value, voucherAmount: $("cAmount").value
+    });
+    if (r.result !== "ok") { A.showMsg(msg, r.message); return; }
+    A.showMsg(msg, "정책을 저장했어요", "ok");
+    await load(true);
+  });
+
+  // ── CSV ────────────────────────────────
+  function downloadCsv(filename, head, rows) {
+    var csv = [head].concat(rows).map(function (r) {
+      return r.map(function (v) {
+        var s = String(v == null ? "" : v);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      }).join(",");
+    }).join("\r\n");
+    var blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  // ── 시작 ────────────────────────────────
+  var saved = localStorage.getItem(K_TOKEN);
+  if (saved) { $("token").value = saved; doLogin(saved); }
+})();
+</script>
+</body>
+</html>
