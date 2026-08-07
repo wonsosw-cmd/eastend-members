@@ -103,6 +103,14 @@ function ymd_(d) {
   return Utilities.formatDate(d || new Date(), TZ, "yyyy-MM-dd");
 }
 
+// 년월 안전 해석: 시트가 "2026-08"을 날짜로 자동 변환해 버리므로
+// 승인일시(항상 Date)에서 다시 뽑는 것을 우선한다. 이게 틀리면 월 한도가 통째로 무력화된다.
+function ymOf_(usedAtVal, ymCell) {
+  if (usedAtVal instanceof Date) return Utilities.formatDate(usedAtVal, TZ, "yyyy-MM");
+  if (ymCell instanceof Date) return Utilities.formatDate(ymCell, TZ, "yyyy-MM");
+  return String(ymCell || "").trim();
+}
+
 /** 휴대전화 정규화: 숫자만 남기고 010-1234-5678 형태로 */
 function normPhone_(v) {
   var d = String(v == null ? "" : v).replace(/[^0-9]/g, "");
@@ -189,7 +197,7 @@ function loadUsage_() {
       self: Number(v[8]) || 0,
       staff: String(v[9]),
       code: String(v[10]),
-      ym: String(v[11]),
+      ym: ymOf_(v[0], v[11]),
       status: String(v[12] || "정상").trim() || "정상",
       memo: String(v[13] || "")
     });
@@ -475,10 +483,18 @@ function handleCafeRedeem_(p) {
   var usageId = Utilities.getUuid().replace(/-/g, "").slice(0, 12);
   var now = new Date();
 
-  sheet_(SHEET_USAGE).appendRow([
+  var ush = sheet_(SHEET_USAGE);
+  ush.appendRow([
     now, usageId, crew.crewId, crew.name, crew.dept, cafe,
     amount, company, self, staff, code, thisYm, "정상", ""
   ]);
+  // 년월(L)·코드(K)는 텍스트로 고정 — 안 그러면 "2026-08"이 날짜로, "0421"이 421로 변한다.
+  // setNumberFormat 직후 flush() 없이 setValue 하면 다시 숫자로 강제변환된다.
+  var ur = ush.getLastRow();
+  ush.getRange(ur, 11, 1, 2).setNumberFormat("@");
+  SpreadsheetApp.flush();
+  ush.getRange(ur, 11).setValue(code);
+  ush.getRange(ur, 12).setValue(thisYm);
 
   // 코드 1회용 소진 + 크루 화면이 결과를 받아갈 수 있도록 짧게 보관
   c.remove("code_" + code);
