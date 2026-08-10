@@ -29,6 +29,16 @@
   .dot { width: 34px; height: 6px; border-radius: 99px; background: #dfe3ea; }
   .dot.used { background: var(--teal); }
   .done-icon { font-size: 44px; }
+  .today-box {
+    background: #e8f5f3; border: 1px solid #c9e6e2; border-radius: 13px;
+    padding: 12px 14px; margin-bottom: 14px;
+  }
+  .today-label { font-size: 11.5px; font-weight: 700; color: #3d7a75; }
+  .today-amount { font-size: 24px; font-weight: 800; color: var(--teal-dark); letter-spacing: -.5px; }
+  .today-sub { font-size: 12px; color: #3d7a75; margin-top: 2px; }
+  .today-box.spent { background: #fdf2e2; border-color: #f3e0c2; }
+  .today-box.spent .today-label, .today-box.spent .today-sub { color: #9c6113; }
+  .today-box.spent .today-amount { color: #9c6113; }
 </style>
 </head>
 <body>
@@ -66,13 +76,19 @@
       <div style="font-size:15px;font-weight:700" id="crewName"></div>
       <div class="hint" id="crewDept" style="margin-bottom:14px"></div>
 
-      <div class="card-title" style="margin-bottom:4px" id="monthLabel">이번 달 남은 횟수</div>
+      <div class="card-title" style="margin-bottom:4px" id="monthLabel">이번 달 남은 일수</div>
       <div class="remain-ring">
         <span class="remain-num mono" id="remainNum">-</span>
         <span class="remain-of mono" id="remainOf"></span>
       </div>
       <div class="dots" id="dots"></div>
-      <p class="hint" id="policyNote" style="margin-bottom:18px"></p>
+      <p class="hint" id="policyNote" style="margin-bottom:14px"></p>
+
+      <div class="today-box hidden" id="todayBox">
+        <div class="today-label">오늘 남은 지원</div>
+        <div class="today-amount mono" id="todayRemain">-</div>
+        <div class="today-sub" id="todaySub"></div>
+      </div>
 
       <button class="btn-teal btn-lg" id="useBtn" type="button">카페 사용하기</button>
       <p class="hint" id="useNote">버튼을 누르면 4자리 코드가 나와요. 카페 직원에게 보여주세요.</p>
@@ -120,10 +136,11 @@
       <div class="card" id="doneSelfBox" style="margin:10px 0 0;background:#fdf6ea;border-color:#f3e0c2">
         <div class="stat-label">본인 부담</div>
         <div class="stat-value mono" id="doneSelf" style="color:#9c6113">-</div>
-        <p class="hint" style="margin-top:4px">1회 지원 한도를 넘은 금액이에요.</p>
+        <p class="hint" style="margin-top:4px">오늘 지원 한도를 넘은 금액이에요.</p>
       </div>
 
-      <button class="btn-primary" id="doneBtn" type="button" style="margin-top:16px">확인</button>
+      <p class="hint" id="doneToday" style="margin-top:12px"></p>
+      <button class="btn-primary" id="doneBtn" type="button" style="margin-top:4px">확인</button>
     </div>
   </section>
 
@@ -190,24 +207,37 @@
     $("crewName").textContent = r.crew.name + " 크루";
     $("crewDept").textContent = r.crew.dept || "";
 
-    var limit = r.policy.monthlyLimit, used = r.month.used;
-    $("monthLabel").textContent = Number(r.month.ym.slice(5)) + "월 남은 횟수";
-    $("remainNum").textContent = r.month.remain;
-    $("remainOf").textContent = "/ " + limit + "회";
+    var limitDays = r.policy.monthlyDays, usedDays = r.month.usedDays;
+    $("monthLabel").textContent = Number(r.month.ym.slice(5)) + "월 남은 이용 일수";
+    $("remainNum").textContent = r.month.remainDays;
+    $("remainOf").textContent = "/ " + limitDays + "일";
 
     var dots = "";
-    for (var i = 0; i < limit; i++) dots += '<div class="dot' + (i < used ? " used" : "") + '"></div>';
+    for (var i = 0; i < limitDays; i++) dots += '<div class="dot' + (i < usedDays ? " used" : "") + '"></div>';
     $("dots").innerHTML = dots;
 
     $("policyNote").textContent =
-      "1회 " + A.won(r.policy.voucherAmount) + " 지원 · 이번 달 " + used + "회 사용 (회사 지원 " + A.won(r.month.companyAmount) + ")";
+      "하루 " + A.won(r.policy.dailyLimit) + "까지 지원 · 이번 달 " + usedDays + "일 사용 (회사 지원 " + A.won(r.month.companyAmount) + ")";
 
-    var canUse = r.month.remain > 0;
+    // 오늘 이미 쓴 날이면 남은 예산을 크게 보여준다 — 나눠 쓸 수 있다는 걸 알아야 하므로
+    var t = r.today;
+    $("todayBox").classList.toggle("hidden", !t.used);
+    $("todayBox").classList.toggle("spent", t.remain <= 0);
+    $("todayRemain").textContent = A.won(t.remain);
+    $("todaySub").textContent = t.remain > 0
+      ? "오늘 " + A.won(t.company) + " 사용 · 남은 금액은 오늘 안에 나눠 쓸 수 있어요"
+      : "오늘 지원 " + A.won(r.policy.dailyLimit) + "을 다 썼어요";
+
+    var canUse = !r.blocked;
     $("useBtn").disabled = !canUse;
-    $("useBtn").textContent = canUse ? "카페 사용하기" : "이번 달 사용 완료";
+    $("useBtn").textContent = canUse
+      ? (t.used ? "이어서 사용하기" : "카페 사용하기")
+      : (t.used ? "오늘 지원 한도 소진" : "이번 달 사용 완료");
     $("useNote").textContent = canUse
-      ? "버튼을 누르면 4자리 코드가 나와요. 카페 직원에게 보여주세요."
-      : "다음 달 1일에 다시 " + limit + "회가 충전돼요.";
+      ? (t.used
+          ? "오늘 남은 " + A.won(t.remain) + " 안에서 지원돼요. 오늘은 몇 번을 써도 1일로 칩니다."
+          : "버튼을 누르면 4자리 코드가 나와요. 카페 직원에게 보여주세요.")
+      : r.blocked;
 
     renderHistory(r.history);
 
@@ -313,6 +343,9 @@
     $("doneCompany").textContent = A.won(d.company);
     $("doneSelf").textContent = A.won(d.self);
     $("doneSelfBox").classList.toggle("hidden", !(d.self > 0));
+    $("doneToday").textContent = d.todayRemain > 0
+      ? "오늘 남은 지원 " + A.won(d.todayRemain) + " — 오늘 안에 더 쓸 수 있어요 (같은 날은 1일로 칩니다)"
+      : "오늘 지원 " + A.won(d.dailyLimit) + "을 모두 사용했어요";
     state.code = "";
     show("doneView");
   }

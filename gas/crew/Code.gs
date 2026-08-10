@@ -2,6 +2,8 @@
  * EASTEND 크루 카페 사용권 — Apps Script 백엔드
  *
  * 구조: 크루 앱(코드 발급) → 카페 공통 승인 화면(코드+금액 입력) → 시트 기록 → 관리자 집계
+ * 정책: 월 N일 × 하루 M원 예산. 한도는 방문 '건수'가 아니라 방문한 '날짜 수'로 세고,
+ *       같은 날 안에서는 예산이 남아 있는 한 몇 번이든 나눠 쓸 수 있다.
  * 시트: 크루 / 사용내역 / 카페 / 설정   (개인정보 포함 — 링크 공유 금지)
  *
  * 최초 1회 setup() 실행 → 로그에 관리자 토큰·카페 토큰 출력
@@ -53,8 +55,8 @@ function setup() {
   var conf = ss.getSheetByName(SHEET_CONF) || ss.insertSheet(SHEET_CONF);
   if (conf.getLastRow() === 0) {
     conf.appendRow(["항목", "값", "설명"]);
-    conf.appendRow(["월한도", DEFAULT_MONTHLY_LIMIT, "1인당 월 최대 방문 횟수"]);
-    conf.appendRow(["1회한도", DEFAULT_VOUCHER_AMOUNT, "1회당 회사 부담 상한(원). 초과분은 크루 자부담"]);
+    conf.appendRow(["월한도", DEFAULT_MONTHLY_LIMIT, "1인당 월 최대 이용 일수(방문한 날짜 기준)"]);
+    conf.appendRow(["1회한도", DEFAULT_VOUCHER_AMOUNT, "하루 회사 부담 상한(원). 같은 날 나눠 써도 합계 기준, 초과분은 크루 자부담"]);
     conf.setFrozenRows(1);
   }
 
@@ -205,11 +207,64 @@ function loadUsage_() {
   return out;
 }
 
-/** 특정 크루의 특정 월 사용 건(정상만) */
-function usageOfMonth_(crewId, ym) {
-  return loadUsage_().filter(function (u) {
-    return u.crewId === crewId && u.ym === ym && u.status === "정상";
+function won_(n) {
+  return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "원";
+}
+
+/**
+ * 크루의 현재 사용 상태. 정책은 "월 N일 × 하루 M원 예산"이다.
+ * 한도는 방문 '건수'가 아니라 방문한 '날짜 수'로 세고, 같은 날 안에서는
+ * 하루 예산이 남아 있는 한 몇 번을 나눠 써도 하루로 친다.
+ */
+function crewUsageState_(crew) {
+  var conf = getConfig_();
+  var limitDays = (crew.limit == null) ? conf.monthlyLimit : crew.limit;
+  var ym = ym_(), today = ymd_();
+
+  var all = loadUsage_().filter(function (u) {
+    return u.crewId === crew.crewId && u.status === "정상";
   });
+  var month = all.filter(function (u) { return u.ym === ym; });
+
+  var byDay = {};
+  month.forEach(function (u) {
+    var d = u.usedAt.slice(0, 10);
+    byDay[d] = (byDay[d] || 0) + u.company;
+  });
+  var days = Object.keys(byDay).sort();
+  var usedToday = byDay.hasOwnProperty(today);
+  var todayCompany = byDay[today] || 0;
+
+  return {
+    conf: conf,
+    limitDays: limitDays,
+    dailyLimit: conf.voucherAmount,
+    ym: ym,
+    today: today,
+    all: all,
+    days: days,
+    usedDays: days.length,
+    remainDays: Math.max(0, limitDays - days.length),
+    usedToday: usedToday,
+    todayCompany: todayCompany,
+    todayRemain: Math.max(0, conf.voucherAmount - todayCompany),
+    monthCompany: month.reduce(function (s, u) { return s + u.company; }, 0)
+  };
+}
+
+/** 지금 사용할 수 있으면 null, 막아야 하면 사유 문자열 */
+function blockReason_(st) {
+  if (st.usedToday) {
+    // 오늘은 이미 시작한 날 — 남은 예산 안에서는 계속 쓸 수 있다 (날짜 수는 더 안 늘어남)
+    if (st.todayRemain <= 0) {
+      return "오늘 지원 한도 " + won_(st.dailyLimit) + "을 모두 사용했어요. 내일 다시 이용할 수 있어요.";
+    }
+    return null;
+  }
+  if (st.usedDays >= st.limitDays) {
+    return st.ym + " 이용 가능한 " + st.limitDays + "일을 모두 사용했어요";
+  }
+  return null;
 }
 
 function cafeList_() {
@@ -300,11 +355,8 @@ function handleCrewLogin_(p) {
 
 /** 크루 화면이 필요로 하는 상태 한 덩어리 */
 function crewStatePayload_(crew) {
-  var conf = getConfig_();
-  var limit = (crew.limit == null) ? conf.monthlyLimit : crew.limit;
-  var thisYm = ym_();
-  var all = loadUsage_().filter(function (u) { return u.crewId === crew.crewId && u.status === "정상"; });
-  var thisMonth = all.filter(function (u) { return u.ym === thisYm; });
+  var st = crewUsageState_(crew);
+  var all = st.all;
 
   var pending = null;
   var code = cache_().get("crew_" + crew.crewId);
@@ -319,13 +371,20 @@ function crewStatePayload_(crew) {
   return {
     result: "ok",
     crew: { crewId: crew.crewId, name: crew.name, phone: crew.phone, dept: crew.dept },
-    policy: { monthlyLimit: limit, voucherAmount: conf.voucherAmount },
+    policy: { monthlyDays: st.limitDays, dailyLimit: st.dailyLimit },
     month: {
-      ym: thisYm,
-      used: thisMonth.length,
-      remain: Math.max(0, limit - thisMonth.length),
-      companyAmount: thisMonth.reduce(function (s, u) { return s + u.company; }, 0)
+      ym: st.ym,
+      usedDays: st.usedDays,
+      remainDays: st.remainDays,
+      companyAmount: st.monthCompany
     },
+    today: {
+      date: st.today,
+      used: st.usedToday,
+      company: st.todayCompany,
+      remain: st.todayRemain
+    },
+    blocked: blockReason_(st),
     pending: pending,
     history: all.sort(function (a, b) { return a.usedAt < b.usedAt ? 1 : -1; }).slice(0, 30).map(function (u) {
       return { usedAt: u.usedAt, cafe: u.cafe, amount: u.amount, company: u.company, self: u.self, ym: u.ym };
@@ -343,13 +402,9 @@ function handleIssueCode_(p) {
   if (!crew) return json_({ result: "error", message: "등록되지 않은 번호예요" });
   if (crew.status !== "활성") return json_({ result: "error", message: "사용이 중지된 계정이에요" });
 
-  var conf = getConfig_();
-  var limit = (crew.limit == null) ? conf.monthlyLimit : crew.limit;
-  var thisYm = ym_();
-  var used = usageOfMonth_(crew.crewId, thisYm).length;
-  if (used >= limit) {
-    return json_({ result: "error", message: thisYm + " 사용 가능 횟수를 모두 사용했어요 (" + used + "/" + limit + "회)" });
-  }
+  var st = crewUsageState_(crew);
+  var blocked = blockReason_(st);
+  if (blocked) return json_({ result: "error", message: blocked });
 
   var c = cache_();
 
@@ -429,17 +484,19 @@ function handleCafeLookup_(p) {
     return json_({ result: "error", message: "유효하지 않거나 시간이 지난 코드예요" });
   }
   var d = JSON.parse(raw);
-  var conf = getConfig_();
   var crew = findCrewById_(d.crewId);
-  var limit = (crew && crew.limit != null) ? crew.limit : conf.monthlyLimit;
-  var used = usageOfMonth_(d.crewId, ym_()).length;
+  if (!crew) return json_({ result: "error", message: "크루 정보를 찾을 수 없어요" });
+  var st = crewUsageState_(crew);
 
   return json_({
     result: "ok",
     name: d.name, dept: d.dept, crewId: d.crewId,
     expiresAt: d.expiresAt,
-    voucherAmount: conf.voucherAmount,
-    monthUsed: used, monthLimit: limit
+    dailyLimit: st.dailyLimit,
+    todayRemain: st.todayRemain,
+    usedToday: st.usedToday,
+    todayCompany: st.todayCompany,
+    monthUsedDays: st.usedDays, monthLimitDays: st.limitDays
   });
 }
 
@@ -468,18 +525,19 @@ function handleCafeRedeem_(p) {
   if (!crew) return json_({ result: "error", message: "크루 정보를 찾을 수 없어요" });
   if (crew.status !== "활성") return json_({ result: "error", message: "사용이 중지된 계정이에요" });
 
-  var conf = getConfig_();
-  var limit = (crew.limit == null) ? conf.monthlyLimit : crew.limit;
-  var thisYm = ym_();
-  var used = usageOfMonth_(crew.crewId, thisYm).length;
-  if (used >= limit) {
+  // 승인 시점에 다시 검사한다 — 코드 발급 이후 같은 날 다른 카페에서 예산을 썼을 수 있다
+  var st = crewUsageState_(crew);
+  var blocked = blockReason_(st);
+  if (blocked) {
     c.remove("code_" + code);
     c.remove("crew_" + crew.crewId);
-    return json_({ result: "error", message: "이번 달 사용 가능 횟수를 모두 사용했어요 (" + used + "/" + limit + "회)" });
+    return json_({ result: "error", message: blocked });
   }
 
-  var company = Math.min(amount, conf.voucherAmount);
-  var self = Math.max(0, amount - conf.voucherAmount);
+  // 회사 부담은 '오늘 남은 예산'까지. 하루 한도를 넘는 만큼은 크루 자부담
+  var company = Math.min(amount, st.todayRemain);
+  var self = Math.max(0, amount - company);
+  var thisYm = st.ym;
   var usageId = Utilities.getUuid().replace(/-/g, "").slice(0, 12);
   var now = new Date();
 
@@ -501,7 +559,9 @@ function handleCafeRedeem_(p) {
   c.remove("crew_" + crew.crewId);
   c.put("used_" + code, JSON.stringify({
     usageId: usageId, name: crew.name, cafe: cafe, amount: amount,
-    company: company, self: self, usedAt: toIso_(now)
+    company: company, self: self, usedAt: toIso_(now),
+    dailyLimit: st.dailyLimit,
+    todayRemain: Math.max(0, st.dailyLimit - (st.todayCompany + company))
   }), RESULT_TTL);
 
   return json_({
@@ -509,7 +569,11 @@ function handleCafeRedeem_(p) {
     usageId: usageId,
     name: crew.name, dept: crew.dept,
     amount: amount, company: company, self: self,
-    monthUsed: used + 1, monthLimit: limit,
+    todayCompany: st.todayCompany + company,
+    todayRemain: Math.max(0, st.dailyLimit - (st.todayCompany + company)),
+    dailyLimit: st.dailyLimit,
+    monthUsedDays: st.usedToday ? st.usedDays : st.usedDays + 1,
+    monthLimitDays: st.limitDays,
     usedAt: toIso_(now)
   });
 }
@@ -654,7 +718,7 @@ function doGet(e) {
     return json_({
       result: "ok",
       cafes: cafeList_().filter(function (c) { return c.status === "활성"; }).map(function (c) { return c.name; }),
-      voucherAmount: getConfig_().voucherAmount,
+      dailyLimit: getConfig_().voucherAmount,
       today: todays.map(function (u) {
         return { usedAt: u.usedAt, name: u.name, cafe: u.cafe, amount: u.amount, company: u.company, self: u.self };
       })
@@ -673,14 +737,20 @@ function doGet(e) {
     var usage = loadUsage_();
     var thisYm = ym_();
 
+    // 한도는 '날짜 수' 기준이라 crew×월마다 방문한 날짜를 따로 센다
     var byCrewMonth = {};
     usage.forEach(function (u) {
       if (u.status !== "정상") return;
       var k = u.crewId + "|" + u.ym;
-      if (!byCrewMonth[k]) byCrewMonth[k] = { count: 0, amount: 0, company: 0 };
-      byCrewMonth[k].count++;
+      if (!byCrewMonth[k]) byCrewMonth[k] = { visits: 0, amount: 0, company: 0, dayset: {} };
+      byCrewMonth[k].visits++;
       byCrewMonth[k].amount += u.amount;
       byCrewMonth[k].company += u.company;
+      byCrewMonth[k].dayset[u.usedAt.slice(0, 10)] = true;
+    });
+    Object.keys(byCrewMonth).forEach(function (k) {
+      byCrewMonth[k].days = Object.keys(byCrewMonth[k].dayset).length;
+      delete byCrewMonth[k].dayset;
     });
 
     var months = {};
@@ -696,12 +766,13 @@ function doGet(e) {
       cafeToken: props_().getProperty("CAFE_TOKEN"),
       crews: crews.map(function (c) {
         var k = c.crewId + "|" + thisYm;
-        var s = byCrewMonth[k] || { count: 0, amount: 0, company: 0 };
+        var s = byCrewMonth[k] || { visits: 0, days: 0, amount: 0, company: 0 };
         return {
           crewId: c.crewId, name: c.name, phone: c.phone, dept: c.dept,
           status: c.status, limit: c.limit, memo: c.memo,
           registeredAt: c.registeredAt,
-          thisMonthCount: s.count, thisMonthAmount: s.amount, thisMonthCompany: s.company
+          thisMonthDays: s.days, thisMonthVisits: s.visits,
+          thisMonthAmount: s.amount, thisMonthCompany: s.company
         };
       }),
       usage: usage.sort(function (a, b) { return a.usedAt < b.usedAt ? 1 : -1; }).map(function (u) {
