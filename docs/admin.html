@@ -63,6 +63,7 @@
   .ss-head .sp { flex: 1; }
   .ss-head .hint { font-size: 11.5px; color: var(--muted); font-weight: 600; }
   .ss-toggle { background: #eef1f6; border: none; border-radius: 8px; padding: 6px 12px; font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--navy); cursor: pointer; }
+  .ss-toggle.ss-dl { background: var(--teal); color: #fff; }
   .ss-body { max-height: 360px; overflow: auto; }
   .ss-table { min-width: 560px; }
   .ss-table th.num, .ss-table td.num { text-align: right; }
@@ -123,6 +124,7 @@
         </label>
         <span class="ss-range-sum" id="ssRangeSum"></span>
         <button class="ss-toggle" id="ssClear" onclick="clearRange()" style="display:none;">기간 초기화</button>
+        <button class="ss-toggle ss-dl" onclick="downloadStoreStats()">⬇ 엑셀 다운로드</button>
         <button class="ss-toggle" id="ssToggle" onclick="toggleStoreStats()">숨기기</button>
       </div>
       <div class="ss-hint2">헤더를 클릭하면 정렬(오름/내림차순), 행을 클릭하면 해당 매장으로 목록이 필터링됩니다</div>
@@ -282,7 +284,8 @@ const SS_COLS = [
   { key: "paid",  label: "적립지급",  num: true },
 ];
 
-function renderStoreStats() {
+// 매장별 집계 데이터(현재 정렬·기간 반영) — 렌더링/다운로드 공유
+function storeStatsData() {
   const today = todayStr();
   const week = new Date(Date.now() - 6*86400000);
   const hasRange = !!(ssFrom || ssTo);
@@ -306,6 +309,12 @@ function renderStoreStats() {
     if (cmp === 0) cmp = a.name.localeCompare(b.name, "ko");
     return ssSortDir === "asc" ? cmp : -cmp;
   });
+  const sum = arr.reduce((a, o) => ({ total: a.total+o.total, today: a.today+o.today, week: a.week+o.week, range: a.range+o.range, paid: a.paid+o.paid }), { total:0, today:0, week:0, range:0, paid:0 });
+  return { arr, hasRange, sum };
+}
+
+function renderStoreStats() {
+  const { arr, hasRange, sum } = storeStatsData();
 
   // 헤더(정렬 화살표)
   document.getElementById("ssThead").innerHTML = "<tr>" + SS_COLS.map(c => {
@@ -333,7 +342,6 @@ function renderStoreStats() {
       ${rangeCell(o)}
       <td class="num">${num(o.paid)}</td>
     </tr>`).join("");
-  const sum = arr.reduce((a, o) => ({ total: a.total+o.total, today: a.today+o.today, week: a.week+o.week, range: a.range+o.range, paid: a.paid+o.paid }), { total:0, today:0, week:0, range:0, paid:0 });
   tf.innerHTML = `<tr>
     <td>합계 (${arr.length}개 매장)</td><td></td>
     <td class="num">${sum.total.toLocaleString()}</td>
@@ -350,6 +358,32 @@ function renderStoreStats() {
     rs.textContent = `${label} · ${sum.range.toLocaleString()}명`;
     clr.style.display = "";
   } else { rs.textContent = ""; clr.style.display = "none"; }
+}
+
+// 매장별 통계 엑셀 다운로드 (현재 정렬·기간 상태 그대로)
+function downloadStoreStats() {
+  const { arr, hasRange, sum } = storeStatsData();
+  if (!arr.length) { alert("통계 데이터가 없습니다."); return; }
+  const rangeLabel = `기간 가입 (${ssFrom || "처음"}~${ssTo || todayStr()})`;
+  const header = ["매장", "브랜드", "전체 가입", "오늘", "최근 7일"];
+  if (hasRange) header.push(rangeLabel);
+  header.push("적립지급");
+  const body = arr.map(o => {
+    const row = [o.name, o.brand, o.total, o.today, o.week];
+    if (hasRange) row.push(o.range);
+    row.push(o.paid);
+    return row;
+  });
+  const footer = ["합계", `${arr.length}개 매장`, sum.total, sum.today, sum.week];
+  if (hasRange) footer.push(sum.range);
+  footer.push(sum.paid);
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...body, footer]);
+  ws["!cols"] = header.map((h, i) => (i <= 1 ? { wch: 16 } : { wch: 13 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "매장별 가입통계");
+  const tag = hasRange ? `_${(ssFrom || "처음").replace(/-/g, "")}-${(ssTo || todayStr()).replace(/-/g, "")}` : "";
+  XLSX.writeFile(wb, `매장별_가입통계_${todayStr().replace(/-/g, "")}${tag}.xlsx`);
 }
 
 function sortStoreStats(key) {
