@@ -24,7 +24,7 @@ window.EE_STORES = [
   { id: "C019", erp: "M5202", brand: "CITYBREEZE", brandKo: "시티브리즈", name: "롯데 대전점" },
   { id: "C020", erp: "M5203", brand: "CITYBREEZE", brandKo: "시티브리즈", name: "롯데 노원점" },
   { id: "C021", erp: "M5204", brand: "CITYBREEZE", brandKo: "시티브리즈", name: "롯데 안산점" },
-  { id: "C022", erp: "", brand: "CITYBREEZE", brandKo: "시티브리즈", name: "더현대 대구" }, // erp(M코드) 확인 후 기입 필요
+  { id: "C022", erp: "M5241", brand: "CITYBREEZE", brandKo: "시티브리즈", name: "더현대 대구" },
   // 아티드 오프라인
   { id: "A001", erp: "M0013", brand: "ARTID", brandKo: "아티드", name: "신세계 대구" },
   { id: "A002", erp: "M0012", brand: "ARTID", brandKo: "아티드", name: "신세계 타임스퀘어" },
