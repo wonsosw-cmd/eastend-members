@@ -100,7 +100,7 @@
   <header>
     <h1>EASTEND 오프라인 멤버십 관리</h1>
     <div class="sp"></div>
-    <button class="primary" onclick="downloadRegXlsx()">📋 회원등록용 엑셀</button>
+    <button class="primary" onclick="downloadRegXlsx()" title="적립금이 아직 지급되지 않은 회원만 내려받습니다">📋 회원등록용 엑셀 <small style="opacity:.8">(미지급자)</small></button>
     <button onclick="downloadCsv()">전체 CSV</button>
     <button onclick="loadData()">새로고침</button>
     <button onclick="logout()">로그아웃</button>
@@ -520,11 +520,16 @@ function toErpStore(storeId, storeName) {
 }
 
 // 회원등록용 데이터 행 생성 (필수 누락자는 skipped로 분리)
+// ★ 적립금 지급이 끝난 회원은 제외한다 (실장님 지시 2026-09-14).
+//   적립지급 V = 판매 프로그램에 이미 등록하고 웰컴 포인트까지 준 사람이다.
+//   다시 내보내면 중복 등록되므로, 이 파일은 **아직 등록 안 한 사람만** 담는다.
 function buildRegRows() {
   const skipped = [];   // 필수(성명·전화·매장·가입일자) 누락 → 제외
   const birthWarn = []; // 생년월일 형식 오류 → 원본 그대로 포함(다운은 됨)
   const rows = [];
+  let paidSkip = 0;     // 적립금 지급 완료 → 등록이 끝난 사람이라 제외
   ROWS.forEach(r => {
+    if (r.paid === "V") { paidSkip++; return; }
     const store = toErpStore(r.storeId, r.storeName);
     const joined = String(r.joinedAt || "").slice(0, 10).replace(/-/g, ""); // 20260722
     const miss = [];
@@ -554,11 +559,14 @@ function buildRegRows() {
     row[29] = `${r.brand || ""} QR가입${r.consentNight === "Y" ? " / 야간수신동의" : ""}`; // 비고
     rows.push(row);
   });
-  return { rows, skipped, birthWarn };
+  return { rows, skipped, birthWarn, paidSkip };
 }
 
-function afterRegDownload(count, skipped, birthWarn, kind) {
-  let msg = `회원등록용 ${kind} ${count}명 다운로드 완료`;
+function afterRegDownload(count, skipped, birthWarn, kind, paidSkip) {
+  let msg = `회원등록용 ${kind} ${count}명 다운로드 완료 (적립금 미지급자만)`;
+  if (paidSkip) {
+    msg += `\n\n· 적립금 지급 완료 ${paidSkip.toLocaleString()}명은 이미 등록된 회원이라 빠졌습니다.`;
+  }
   if (birthWarn.length) {
     msg += `\n\n⚠ 생년월일 형식 확인 필요 ${birthWarn.length}명 (그대로 포함됨):\n` + birthWarn.join("\n")
         + `\n\n→ ‘생년월일 확인필요(오류)’ 필터로 찾아 수정할 수 있습니다.`;
@@ -572,8 +580,13 @@ function afterRegDownload(count, skipped, birthWarn, kind) {
 
 // 엑셀(.xlsx) 다운로드 — 모든 칸을 텍스트로(선행0·전화번호·YYYYMMDD 보존)
 function downloadRegXlsx() {
-  const { rows, skipped, birthWarn } = buildRegRows();
-  if (!rows.length) { alert("등록 가능한 회원이 없습니다."); return; }
+  const { rows, skipped, birthWarn, paidSkip } = buildRegRows();
+  if (!rows.length) {
+    alert(paidSkip
+      ? `새로 등록할 회원이 없습니다.\n\n전체 ${ROWS.length.toLocaleString()}명이 모두 적립금 지급 완료 상태입니다.`
+      : "등록 가능한 회원이 없습니다.");
+    return;
+  }
 
   const aoa = [REG_HEADER, ...rows];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -588,8 +601,8 @@ function downloadRegXlsx() {
   ws["!cols"] = [{wch:10},{wch:6},{wch:15},{wch:8},{wch:10},{wch:8},{wch:8},{wch:9},{wch:11},{wch:8}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "회원등록");
-  XLSX.writeFile(wb, `DD회원등록_${todayStr().replace(/-/g, "")}.xlsx`);
-  afterRegDownload(rows.length, skipped, birthWarn, "엑셀");
+  XLSX.writeFile(wb, `DD회원등록_미지급_${todayStr().replace(/-/g, "")}.xlsx`);
+  afterRegDownload(rows.length, skipped, birthWarn, "엑셀", paidSkip);
 }
 
 function downloadCsv() {
